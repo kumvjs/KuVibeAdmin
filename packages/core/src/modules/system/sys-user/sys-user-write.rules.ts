@@ -99,8 +99,12 @@ export function buildSysUserWriteState(
   if (homePath && (!homePath.startsWith('/') || /\s/u.test(homePath)))
     invalid('homePath 必须是以 / 开头且不包含空白的路径')
 
+  const avatar = nullableString(dto.avatar, 'avatar', 500, current?.avatar)
+  if (avatar !== current?.avatar && avatar && /\/attachments\/[1-9]\d*\/(?:public|content)(?:[?#]|$)/.test(avatar))
+    invalid('系统附件头像必须通过头像绑定接口设置，不能直接写入下载 URL')
+
   return {
-    avatar: nullableString(dto.avatar, 'avatar', 500, current?.avatar),
+    avatar,
     deptId,
     description: nullableString(dto.description, 'description', 500, current?.description),
     homePath,

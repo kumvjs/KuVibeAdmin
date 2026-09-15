@@ -1,6 +1,3 @@
-export const PLAYGROUND_UPLOAD_MAX_BYTES = 6 * 1024 * 1024
-export const PLAYGROUND_UPLOAD_RETENTION_MS = 24 * 60 * 60 * 1000
-
 export function isPlaygroundEnabled(environment: string | undefined = process.env.NODE_ENV): boolean {
   return (environment ?? 'development') !== 'production'
 }

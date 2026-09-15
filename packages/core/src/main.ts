@@ -59,7 +59,10 @@ async function bootstrap() {
   ]
   const staticRoot = staticRootCandidates.find(candidate => existsSync(candidate))
   if (staticRoot) {
-    app.useStaticAssets({ root: staticRoot })
+    app.useStaticAssets({
+      root: staticRoot,
+      allowedPath: pathname => !/^\/?uploads(?:\/|$)/.test(pathname),
+    })
   }
   else {
     console.warn(`[BOOT] static assets directory not found; checked: ${staticRootCandidates.join(', ')}`)

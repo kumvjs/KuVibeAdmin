@@ -4,12 +4,14 @@ import FastifyMultipart from '@fastify/multipart'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
 import { AppModule } from '#/app.module.js'
+import { UPLOAD_MAX_BYTES } from '#/modules/upload/upload.constants.js'
 
 // eslint-disable-next-line antfu/no-top-level-await
 const app = await NestFactory.create<NestFastifyApplication>(
   AppModule,
   new FastifyAdapter({
     trustProxy: true,
+    requestTimeout: 120_000,
     logger: {
       level: 'info',
     },
@@ -32,7 +34,7 @@ app.register(helmet)
 app.register(FastifyMultipart, {
   limits: {
     fields: 10, // Max number of non-file fields
-    fileSize: 1024 * 1024 * 6, // limit size 6M
+    fileSize: UPLOAD_MAX_BYTES, // Resource ceiling; UploadController applies the database policy per request.
     files: 5, // Max number of file fields
   },
 })
@@ -49,9 +51,8 @@ app.getHttpAdapter().getInstance().addHook('onRequest', (request, reply, done) =
 
   const { url } = request
 
-  // Playground uploads are temporary development artifacts. Even if a
-  // deployment accidentally reuses that directory, never expose it in production.
-  if (process.env.NODE_ENV === 'production' && /^\/uploads(?:\/|$)/.test(url))
+  // Superseded temporary files are never part of the system attachment store.
+  if (/^\/uploads(?:\/|$)/.test(url))
     return reply.code(404).send()
 
   if (url.endsWith('.php')) {

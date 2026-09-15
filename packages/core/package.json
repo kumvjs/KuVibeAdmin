@@ -24,6 +24,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:upload:integration": "nest build && cross-env NODE_ENV=test TYPEORM_TYPE=postgres node test/upload.integration.mjs",
     "typeorm": "cross-env NODE_ENV=local typeorm-ts-node-commonjs",
     "migration:create": "pnpm typeorm migration:create ./src/migrations/initData",
     "migration:generate": "pnpm typeorm -d ./dist/src/config/database.config.js migration:generate ./src/migrations/update-table",
@@ -59,6 +60,7 @@
     "dayjs": "^1.11.23",
     "dotenv": "^17.4.2",
     "fastify": "^5.12.1",
+    "file-type": "22.0.2",
     "helmet": "^8.3.0",
     "ioredis": "^6.0.0",
     "joi": "^18.2.5",
@@ -74,9 +76,11 @@
     "qs": "^6.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sharp": "^0.35.4",
     "socket.io": "^4.8.3",
     "typeorm": "^1.1.1",
-    "ua-parser-js": "^2.0.10"
+    "ua-parser-js": "^2.0.10",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.3.0",
@@ -91,6 +95,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^7.2.1",
+    "@types/yauzl": "^3.4.0",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",

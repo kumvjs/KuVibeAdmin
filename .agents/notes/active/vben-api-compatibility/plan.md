@@ -89,6 +89,8 @@ Acceptance: timezone is per-user and durable across processes/devices; invalid z
 
 ## M7 — Optional full-playground parity
 
+Scope revision: the completed temporary upload below describes the original implementation only. System uploads now belong to M7.1; table, bigint, and status remain optional demos.
+
 - [x] Fix upload configuration injection to use `APP_CONFIG.KEY` and cover actual Nest module dependency resolution with a regression test.
 - [x] Implement authenticated `POST /upload` as a non-production local temporary-image adapter using the existing multipart/static stack, random object names, a 6 MiB limit, MIME/signature checks, public URLs, 24-hour cleanup, no metadata table, and no production route/static exposure.
 - [x] Implement authenticated `GET /table/list` with deterministic fixture data and no fake product table.
@@ -97,6 +99,21 @@ Acceptance: timezone is per-user and durable across processes/devices; invalid z
 - [x] Do not implement mock-only `GET /test` or `POST /test`.
 
 Acceptance: retained examples serve an explicit frontend demo, introduce no fake production domain, and expose no diagnostic behavior in production.
+
+## M7.1 — System attachment management (complete)
+
+Design: [attachment-design.md](attachment-design.md). New tables are created by the deployment owner; no migration. The user approved default-private access, explicitly authorized public images, and local storage first. The verified system module replaces the original Playground upload; existing temporary files are not migrated or deleted.
+
+- [x] Add explicitly typed attachment, upload-policy, and business-reference entities; implement permission-controlled policy management with validated settings and audit fields.
+- [x] Cache policy reads in shared Redis; implement post-commit invalidation, bounded TTL, concurrent-refill protection, and tested cache-failure behavior; real Redis Lua/TTL and PostgreSQL constraints/transactions are verified in disposable containers.
+- [x] Extract `POST /upload` into a production-capable UploadModule, implement configurable multi-format validation and streaming local storage outside the static webroot, and persist attachment metadata with failure compensation.
+- [x] Add object-authorized private downloads, explicitly controlled public-image access, attachment pagination/detail/delete, and download auditing.
+- [x] Add trusted business binding/unbinding and reference-aware cleanup; integrate avatar attachment references without silently changing existing URL consumers.
+- [x] Verify HTTP/permission/storage/cache/concurrency behavior, update Swagger and current docs, and remove the superseded Playground upload code only when its replacement passes.
+
+Acceptance: policy cache hits perform no policy-table reads; supported formats and limits change through managed settings; private bytes cannot bypass authorization through static paths; referenced files survive cleanup; metadata/storage failures are recoverable; production upload and existing Vben calls are verified.
+
+Evidence: 40 Jest suites / 233 tests, 19 isolated PostgreSQL/Redis/Fastify integration checks under `NODE_ENV=production`, TypeScript, changed-code ESLint, Nest/VitePress builds, and locked Vben contract verification passed. HTTP tests verify the backend Vben upload contract, not a browser-driven frontend session; full login/Passport/Vben e2e remains M8. Deployment still owns creating four tables, initializing policies, persistent storage, and any antivirus integration.
 
 ## M8 — Verification and release gates
 

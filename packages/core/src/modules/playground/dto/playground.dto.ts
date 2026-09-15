@@ -105,8 +105,3 @@ export class PlaygroundTableResponseDto {
   @ApiProperty()
   total: number
 }
-
-export class UploadResponseDto {
-  @ApiProperty({ description: '临时公开图片 URL' })
-  url: string
-}

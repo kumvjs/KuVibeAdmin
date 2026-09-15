@@ -118,11 +118,11 @@ Content-Type: application/json
 
 ## Playground 演示接口
 
-`PlaygroundModule` 只在 `NODE_ENV` 非 `production` 时注册。生产环境不存在 `/table/list`、`/upload`、`/demo/bigint`、`/status` 路由，并会显式拒绝 `/uploads/*` 静态访问。`GET/POST /test` 属于上游 mock 诊断接口，本项目不实现。
+`PlaygroundModule` 只在 `NODE_ENV` 非 `production` 时注册，保留 `/table/list`、`/demo/bigint`、`/status`。上传已移入生产可用的 `UploadModule`。旧 `/uploads/*` 静态访问不再开放；`GET/POST /test` 属于上游 mock 诊断接口，本项目不实现。
 
 `GET /api/table/list` 支持 `page/pageSize/sortBy/sortOrder`，分页限制为每页最多 100 条，排序字段使用白名单。它返回固定的 100 条演示数据，进程重启后内容不变，不查询或创建业务数据库表。
 
-`POST /api/upload` 接收且只接收 multipart 字段 `file`。文件不得超过 6 MiB，只允许 MIME 与文件魔数一致的 JPEG、PNG 或 WebP；原文件名不会用于磁盘路径。文件以 UUID 名称写入本地 `public/uploads/<UTC年>/<UTC月>`，URL 位于 API origin 的 `/uploads/...`，24 小时后由启动/上传时清理。它是公开 URL 的临时单机演示存储，没有元数据、所有权管理或删除 API，也没有病毒扫描；生产资产应另行选择对象存储、鉴权、内容扫描和生命周期策略。
+`POST /api/upload` 接收一个 multipart `file`，query `purpose` 默认 `attachment`，格式/大小来自带 Redis 缓存的数据库策略。系统附件支持受控公开头像、鉴权下载、附件管理及引用安全清理，返回仍有 `data.url` 和字符串附件 ID。策略、下载及管理接口的完整结构见 Swagger；部署、私有 URL 使用方式及未扫描边界见[系统附件](../modules/attachments.md)。
 
 `GET /api/demo/bigint` 为验证 Vben `json-bigint` 转换而保留原始 JSON 响应，两个 `id` 以超出 JavaScript 安全整数范围的数字字面量发送，不经过普通 JSON 对象序列化。除此之外，项目 JSON 接口仍使用统一 `ResOp<T>` 转换。
 

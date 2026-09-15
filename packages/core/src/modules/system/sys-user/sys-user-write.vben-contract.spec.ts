@@ -6,6 +6,7 @@ import { DeptStatus } from '#/modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '#/modules/system/dept/entities/dept.entity.js'
 import { SysRoleEntity } from '#/modules/system/role/entities/role.entity.js'
 import { RoleStatus } from '#/modules/system/role/role.types.js'
+import { AttachmentReferenceEntity } from '#/modules/upload/entities/attachment-reference.entity.js'
 import SysUserRoleEntity from '#/modules/user/entities/user-role.entity.js'
 import { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import { authKeys } from '#/shared/cache/keys/auth.keys.js'
@@ -70,6 +71,8 @@ describe('vben system-user writes', () => {
   }
   const manager = {
     getRepository: jest.fn((entity: unknown) => {
+      if (entity === AttachmentReferenceEntity)
+        return { findBy: jest.fn().mockResolvedValue([]) }
       if (entity === SysUserEntity)
         return transactionalUserRepository
       if (entity === SysUserRoleEntity)

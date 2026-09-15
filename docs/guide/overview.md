@@ -44,7 +44,8 @@ AppModule
 ├─ AuthModule               登录、JWT、Refresh Token
 ├─ UserModule               当前用户与用户角色
 ├─ SystemModule             dept / user / role / menu / log
-├─ PlaygroundModule         仅非生产环境的 table / upload / bigint / status
+├─ UploadModule             系统附件、策略缓存、鉴权下载与业务引用
+├─ PlaygroundModule         仅非生产环境的 table / bigint / status
 ├─ WebsocketModule          会话、Server 注册与推送基础设施
 └─ AiModule                 当前为占位模块
 ```

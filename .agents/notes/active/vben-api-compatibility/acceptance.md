@@ -169,6 +169,8 @@ Later implementation acceptance is defined per milestone in `plan.md` and must b
 
 ## Completed batch: M7
 
+The temporary-upload checks below record the original implementation. They do not constitute acceptance of the newly requested system attachment module; M7.1 replaces that scope.
+
 - [x] The real Playground module compiles with globally registered app configuration; the upload service injects `APP_CONFIG.KEY`, not the configuration factory. Regression test reproduced the startup exception before the fix and passes afterward.
 - [x] A dedicated Playground module exposes exactly the four locked frontend contracts outside production and is not registered when `NODE_ENV=production`.
 - [x] `GET /table/list` requires authentication, validates bounded pagination/sorting, returns deterministic `{ items,total }` fixtures, and creates no product table.
@@ -177,4 +179,24 @@ Later implementation acceptance is defined per milestone in `plan.md` and must b
 - [x] `GET /demo/bigint` requires authentication and preserves the locked oversized integer literals through an explicit raw-JSON response boundary.
 - [x] `GET /status` is public only inside the non-production module, returns the requested HTTP status with the standard error envelope, and defaults to 200 so the params-serializer demo can inspect its response URL.
 - [x] Mock-only `GET /test` and `POST /test` are absent.
+- [x] M7.1 supersedes the temporary upload; system attachment acceptance is recorded below.
 - [x] Focused/full tests, test type-checking, changed-file ESLint, Nest build, locked Vben fixtures, docs, and diff checks pass proportionally.
+
+## Completed batch: M7.1 entity and policy foundation
+
+- [x] Three explicitly typed PostgreSQL entities build valid TypeORM metadata without database access; attachment references use a restrictive foreign key and unique active mappings.
+- [x] Policy read/full replacement use dedicated RBAC permissions, Swagger DTOs, the standard JSON envelope, validated purpose identifiers, format/size/count/retention rules, and transactional writes.
+- [x] Policy cache hits bypass policy-table reads; cached invalid data is not trusted; missing/disabled/invalid policies fail closed at the service boundary.
+- [x] Generation-fenced refill rejects old queries after invalidation. Tests cover negative caching, process-local request coalescing, Redis failure rate limits, invalidation retries, and no invalidation after rollback.
+- [x] Focused tests: 4 suites / 32 tests. Full tests: 40 suites / 233 tests. TypeScript, changed-code ESLint, Nest build and diff checks pass. PostgreSQL constraint execution and Redis Lua execution have not been integration-tested.
+
+## Completed M7.1 — System attachment management
+
+- [x] System `POST /upload` is available outside Playground, preserves single multipart `file` and `ResOp`/`url`, and returns HTTP 200 matching Swagger. Policy values govern limits, formats and image dimensions.
+- [x] Thirteen configured formats are exercised against real validators, including Office-container spoofing rejection. Files stream into non-static storage, unsafe paths/symlinks are rejected, multipart streams closed before persistence fail promptly, and unsuccessful requests compensate their files.
+- [x] Private downloads reject anonymous/cross-user access; explicit administrator permissions guard management routes. Unknown business references do not authorize the owner. Public avatars require active user/profile binding.
+- [x] Avatar binding/unbinding and legacy profile replacement preserve URL response compatibility while tracking references. Cleanup and binding serialize on attachment locks; referenced files survive cleanup/deletion attempts.
+- [x] PostgreSQL executes foreign-key/unique/check constraints and real failed-ready-write/business rollback tests. Physical-delete failure leaves retryable state. Upload and download-authorization audit records persist.
+- [x] Real Redis tests prove cache hits avoid policy queries and stale concurrent refills are fenced. Unit tests cover Redis failure and bounded fallback/invalidation retries.
+- [x] Final verification: 40 Jest suites / 233 tests; 19 disposable PostgreSQL/Redis/Fastify checks under production environment; TypeScript, changed-code ESLint, Nest build, VitePress build, Vben lock/snapshot/fixtures and diff checks passed.
+- [x] No migration or business-database DDL was executed; test schemas/prefixes and temporary files are isolated. Antivirus remains an explicitly unscanned replaceable provider by default; full browser/login e2e is not claimed and remains M8.

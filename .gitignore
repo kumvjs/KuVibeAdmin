@@ -49,6 +49,7 @@ lerna-debug.log*
 .tmp
 
 # Runtime data
+/packages/core/var/attachments/
 pids
 *.pid
 *.seed

@@ -1,4 +1,5 @@
 export * from './auth.keys.js'
 export * from './online.keys.js'
 export * from './redis.keys.js'
+export * from './upload.keys.js'
 export * from './user.keys.js'

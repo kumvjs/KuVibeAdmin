@@ -32,4 +32,12 @@ Establish the authoritative Vben API scope and implement the versioned backlog i
 - The existing role-based RBAC remains the preferred authorization model.
 - M5 resolves the upstream user `permissions` ambiguity in favor of the existing RBAC model: management requests use explicit `roleIds`, and no direct per-user menu grants are persisted.
 - The deployment owner will create the redesigned user tables directly. M5 must not generate a migration or retain legacy MD5 rows in the fresh schema.
-- M7 is playground-only: its module and temporary uploads are unavailable in production, and demonstration data must not become a business table or managed asset domain.
+- M7's table, bigint, and status examples remain playground-only. The original temporary-upload scope is superseded by M7.1: production-capable system attachment management, database-backed cached upload policies, and authorized downloads. New attachment tables are deployment-owned; no migration or legacy-file conversion is required.
+
+## System attachment requirement (M7.1)
+
+- Move `POST /upload` out of Playground into a reusable system module for avatars and business attachments; preserve the canonical JSON response envelope and explicitly test frontend compatibility.
+- Support common image, document, archive, and media formats through configurable allowlists and size limits, not environment-only business settings. Persist policies and attachment metadata, provide permission-controlled management, and reuse Redis so cache hits do not query policy tables.
+- Support authenticated and object-authorized downloads. Approved security default: private files; explicitly approved business purposes may publish public images. Possession of an attachment ID is not download permission.
+- This is a new feature: the deployment owner creates its tables. Explicitly declare every entity column's database type. Do not generate migrations or delete/convert existing temporary files implicitly.
+- Approved defaults, security boundaries, cache consistency, and completed delivery are in [attachment-design.md](attachment-design.md). M7.1 includes production upload/download, attachment administration, persistent audit, trusted business binding, avatar integration, and reference-aware cleanup. Browser-driven Vben/complete login verification remains M8.

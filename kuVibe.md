@@ -2,7 +2,7 @@
 
 <!--
 kuvibe:
-  version: 0.2.0
+  version: 0.3.2
   projectSchema: 2
   minimumSupportedProjectSchema: 1
 -->
@@ -10,6 +10,8 @@ kuvibe:
 ## 1. KuVibe Identity
 
 **Ku is Cool.** Ku 表达“酷 / Cool”，Vibe 来自 Vibe Coding。KuVibe is a file-first software engineering protocol: the user states intent, while the coding agent supplies context retrieval, focused clarification, engineering analysis, planning, verification, living documentation, and durable engineering memory.
+
+KuVibe is open source: [github.com/kumvjs/KuVibe](https://github.com/kumvjs/KuVibe). Visit the repository for the latest protocol, documentation, and updates. If KuVibe helps you, star the project, share it with others, or contribute ideas, issues, and improvements.
 
 This file is the user interface. Never require the user to install a CLI, learn workflow commands, classify their task, select capabilities, or manage skills.
 
@@ -52,12 +54,12 @@ After a successful bootstrap or upgrade, maintain `.agents/kuvibe.yaml` separate
 
 ```yaml
 kuvibe:
-  version: 0.2.0
+  version: 0.3.2
   schema: 2
 templates:
   agents-router: 1
-  requirement-workflow: 1
-  development-workflow: 1
+  requirement-workflow: 2
+  development-workflow: 2
   review-workflow: 1
   documentation-workflow: 1
 initializedAt: <ISO-8601 timestamp with offset>
@@ -109,6 +111,8 @@ After all steps pass, write one timestamped migration note and then update `.age
 ### 4.6 Supported Migration Index
 
 **Schema 1 -> 2 (pre-versioning harness adoption):** Schema 1 is the implicit layout used before `.agents/kuvibe.yaml` existed. Preserve all existing project/context/docs/note content. Add the state file. Convert an unmodified generated `AGENTS.md` router to the managed block format; otherwise preserve its content and add or merge only the bounded router block. Add current template metadata to unmodified workflows; treat customized or uncertain workflows as mixed and merge current requirements without replacing their rules. Ensure requirement routing performs the version check before normal work. Validate all required harness files, managed-block boundaries, readable project context, valid state values, and unchanged historical notes/project documentation. Only then record the schema-1-to-2 migration note and set schema `2` and release `0.2.0`.
+
+After the historical schema-1-to-2 adoption step above, apply any remaining same-schema refresh to this protocol's current release and managed revisions before recording final installed state.
 
 ## 5. Greenfield Bootstrap
 
@@ -252,6 +256,20 @@ Write meaningful history to `.agents/notes/implemented/YYYYMMDD-HHmm-TYPE-SLUG.m
 
 Finish only when the requirement and blocking questions are resolved, implementation and proportional tests pass, acceptance is verified, review is complete, documentation impact is handled, and a note is written or explicitly N/A.
 
+### 30.1 Automatic Version Impact at Requirement Completion
+
+**The trigger is a completed requirement/change set, never a file save, filesystem event, individual Git commit, intermediate artifact, or repeated completion check.** A requirement may span many commits. Evaluate its aggregate impact once after implementation, acceptance, review, and documentation checks succeed. A version bump does not authorize a commit, tag, package publication, or hosted release.
+
+1. Read the project's version convention and source of truth. During initialization, preserve an existing release scheme; record source files, fixed/independent package policy, and pre-1.0 policy in project/context Markdown. Do not impose KuVibe's own package versions on consumer projects. If no product version exists or the established release process defers bumps, record N/A or deferred with evidence instead of inventing a manifest or bypassing that process.
+2. Classify semantic impact from external behavior, capabilities, compatibility, public contracts, and harness structure, never line count or commit count. `none`: no release-visible change (temporary files, caches, pure whitespace/formatting, unfinished work). `patch`: compatible bug/security/compatibility fixes, performance improvements, prompt or documentation corrections, and internal refactors preserving behavior. `minor`: new compatible capabilities, detectors, adapters, commands, optional templates/workflows, or configuration. `major`: incompatible public behavior/contracts, removed support, broken template consumers, changed entry conventions, or required incompatible migration. Highest impact wins across the completed change set: major > minor > patch > none.
+3. Apply the project's pre-1.0 policy separately from semantic classification. KuVibe uses patch for compatible fixes and minor for compatible features or controlled breaking changes while major is zero. Retain the breaking-change description and migration requirements even when the effective bump is minor. Advancing to `1.0.0` requires an explicit protocol-stability decision; do not infer it from a routine protocol edit. At `1.0.0` and above, breaking changes require major. Other projects retain their established policy.
+4. Assess Project Schema independently: increment its integer by one only for a harness structural contract change (required files, paths, responsibilities, or lifecycles), with an explicit consecutive migration and preservation checks. Compatible prompt/workflow refinements do not change schema. Increment each changed managed template's revision independently. A release increment alone never requires schema migration.
+5. Before version writes, record the change-set identity, baseline, target, semantic/effective impact, schema decision, reasons, and affected version sources in the active plan or engineering note. Compute MAJOR.MINOR.PATCH with integer components: patch increments patch; minor increments minor and resets patch; major increments major and resets minor/patch; none preserves the version. For example, `0.4.9 + patch = 0.4.10`. Never use decimal arithmetic. Preserve an established prerelease process; do not silently strip prerelease/build metadata or invent a promotion.
+6. Make completion retry-safe: consult the recorded decision and existing note/changelog before calculating. Reuse the same baseline and target if the same change set is already applied or partially applied; finish missing synchronization without another increment or duplicate changelog entry. If scope expands before completion, recompute the highest impact from the original baseline. If version sources changed concurrently or disagree with both baseline and target, reconcile ownership/evidence before writes; never overwrite another requirement's version. A separately accepted new requirement gets a new decision.
+7. Synchronize the source of truth, relevant package versions/internal dependency references and lock metadata when required by the package manager, release metadata, changelog, and note. Record previous/next version, impact/reason, and schema outcome in the note when one exists; otherwise record the decision in the completion summary (and changelog for a bump). `none` needs a reason, not an artificial release entry. Preserve existing changelog history and unrelated pending entries.
+8. KuVibe itself uses root `package.json` as release authority and a fixed release shared by `packages/cli/package.json`. Synchronize current `kuVibe.md` release metadata/examples, `templates/kuvibe.yaml`, affected template revisions, current-version docs, and `CHANGELOG.md`. Validate candidate files first, then update this repository's `.agents/kuvibe.yaml` release/schema/applied revisions and `lastUpdatedAt`, preserving `initializedAt`, and run final consistency validation. Do not rewrite historical migration specifications, fixtures, or notes. In a consumer project, bump that product's versions only; installed KuVibe release/schema state changes only through KuVibe adoption/refresh/migration.
+9. Failed acceptance or validation leaves the requirement incomplete: do not advance installed state, publish, or claim DONE. Retain baseline/target and completed/pending steps for repair and retry; never chain another bump from a partial target. Only after synchronized metadata, changelog, schema/revisions, and final checks pass is the version gate complete. Ordinary automatic bump choices require no user selection of patch/minor/major.
+
 ## 31. Architecture Change Workflow
 
 For changes to system boundaries, module ownership, public contracts, persistence strategy, deployment topology, or protocol fundamentals: document drivers and alternatives, obtain approval for Level 3 risk, update current architecture docs, implement/verify migration and rollback paths, and preserve rationale in an architecture note.
@@ -275,4 +293,9 @@ Tests and acceptance            ✓
 Review                          ✓
 Documentation impact            ✓ / N/A
 Engineering note                ✓ / N/A
+Version impact analysis         ✓
+Release version synchronized    ✓ / N/A (reason)
+Schema / template revisions     ✓ / N/A (reason)
+CHANGELOG updated               ✓ / N/A (reason)
+Final version consistency       ✓ / N/A
 ```

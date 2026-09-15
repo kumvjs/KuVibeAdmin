@@ -248,9 +248,9 @@ Vben v5.7.0 用户页可使用 `GET /system/user/list` 及用户 POST、PUT、DE
 
 ### Playground 演示接口
 
-M7 已对齐锁定版 Vben 的 `/table/list`、`/upload`、`/demo/bigint` 和 `/status`。这些路由只在 local/development/test 环境存在；生产环境不注册模块。表格使用固定 fixture，bigint 接口刻意返回原始超长数字 JSON，status 接口默认 200 并允许通过 `status` 查询参数模拟 200–599。
+Playground 保留 `/table/list`、`/demo/bigint` 和 `/status`，只在 local/development/test 环境存在。表格使用固定 fixture，bigint 接口刻意返回原始超长数字 JSON，status 接口默认 200 并允许通过 `status` 查询参数模拟 200–599。
 
-上传接口要求 Access Token，表单字段固定为 `file`，仅接受不超过 6 MiB 且 MIME/魔数一致的 JPEG、PNG、WebP。返回 URL 指向本地临时静态文件，保留 24 小时；它只适合单机 Playground，不应作为生产对象存储。上游 mock-only 的 GET/POST `/test` 不提供。
+`POST /upload` 已迁入生产可用的系统附件模块，仍要求 Access Token 和单个 multipart `file`，返回 `ResOp`，业务数据保留 `url` 并增加附件 ID、可见性等信息。格式/大小按数据库用途策略配置，默认用途是 `attachment`，需预先配置。私有 URL 必须携带认证下载 Blob，不能直接作匿名图片地址；头像用 `purpose=avatar` 上传后调用绑定接口，明确公开且已绑定的图片才提供匿名地址。详见[系统附件](../modules/attachments.md)。上游 mock-only 的 GET/POST `/test` 不提供。
 
 ### 尚缺适配
 

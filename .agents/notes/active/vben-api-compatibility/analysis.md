@@ -72,14 +72,16 @@ The menu form can submit `type`, `name`, `pid`, `meta.title`, `path`, `activePat
 
 ### Playground examples (4)
 
+M7.1 has moved uploads into system attachment management. See [attachment-design.md](attachment-design.md) for the policy/cache/private-download boundary. Other demo routes retain their original scope.
+
 | Method | Path | Decision |
 | --- | --- | --- |
 | GET | `/table/list` | Implemented in M7 with deterministic in-memory fixtures; no fake product table |
-| POST | `/upload` | Implemented in M7 as authenticated, temporary local raster-image storage outside production; returns `{ url }` |
+| POST | `/upload` | Replaced in M7.1 by authenticated, policy-controlled system attachment storage in all environments; preserves `ResOp` and `data.url`, adds attachment metadata |
 | GET | `/demo/bigint` | Implemented in M7 as an authenticated fixed raw-JSON contract fixture; no table |
 | GET | `/status?status=...` | Implemented in M7 as a public non-production status simulator |
 
-`GET /test` and `POST /test` are mock-only diagnostics and are not implemented. The download example calls an external static URL and is not a local backend endpoint. All retained M7 routes are registered by a dedicated Playground module only when `NODE_ENV` is not production; production additionally refuses `/uploads/*` static access. The local upload adapter accepts one JPEG/PNG/WebP image up to 6 MiB, identifies content by magic bytes, assigns a UUID filename, exposes it under `/uploads`, and removes artifacts older than 24 hours. It intentionally has no metadata table or deletion API because it is not a managed asset domain.
+`GET /test` and `POST /test` are mock-only diagnostics and are not implemented. The upstream download example calls an external URL, but the system module now provides its own object-authorized downloads. Playground retains only table/bigint/status outside production. M7.1 stores random-key files outside the static root, persists policy/attachment/reference/audit records, supports thirteen configurable formats and private downloads, and only reclaims unreferenced files. Public avatar bytes require a current business binding. Old `/uploads` static access and the old 24-hour directory-wide cleanup are removed; old files are preserved. Frontend callers must distinguish authenticated download URLs from public images.
 
 ## Contract gaps in the existing backend
 

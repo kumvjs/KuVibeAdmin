@@ -12,6 +12,7 @@ import { DeptStatus } from '#/modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '#/modules/system/dept/entities/dept.entity.js'
 import { SysRoleEntity } from '#/modules/system/role/entities/role.entity.js'
 import { RoleStatus } from '#/modules/system/role/role.types.js'
+import { releaseUserAvatarReferences } from '#/modules/upload/attachment-reference.lifecycle.js'
 import SysUserRoleEntity from '#/modules/user/entities/user-role.entity.js'
 import { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import { hashPassword } from '#/modules/user/password-hasher.js'
@@ -151,6 +152,8 @@ export class SysUserService {
         current.passwordAlgorithm = PasswordAlgorithm.ARGON2ID
       }
 
+      if (state.avatar !== current.avatar)
+        await releaseUserAvatarReferences(manager, id)
       Object.assign(current, state)
       await repository.save(current)
       if (submittedRoleIds)
@@ -188,6 +191,7 @@ export class SysUserService {
 
       await manager.getRepository(RefreshTokenEntity).delete({ userId: id })
       await manager.getRepository(SysUserRoleEntity).delete({ userId: id })
+      await releaseUserAvatarReferences(manager, id)
       const result = await repository.softDelete({ id })
       if (result.affected !== 1)
         throw new ConflictException('用户删除失败，请刷新后重试')

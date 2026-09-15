@@ -9,7 +9,11 @@
       "jest",
       "node"
     ],
-    "resolvePackageJsonExports": false
+    "resolvePackageJsonExports": false,
+    "paths": {
+      "#/*": ["src/*"],
+      "file-type": ["node_modules/file-type/source/index.d.ts"]
+    }
   },
   "include": [
     "src/**/*.spec.ts",

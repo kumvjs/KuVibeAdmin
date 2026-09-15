@@ -1,5 +1,5 @@
-# Review Workflow
+# 审查工作流
 
-<!-- kuvibe: template=review-workflow revision=1 ownership=kuvibe -->
+<!-- kuvibe: template=review-workflow revision=1 ownership=mixed -->
 
-Review correctness first, then regressions, authorization/security, data integrity, concurrency, backward compatibility, cache invalidation, observability, maintainability, tests, operations, and documentation. Verify migrations in both directions where practical. Resolve material findings before completion and state anything not verified.
+先检查正确性，再检查回归、授权/安全、数据完整性、并发、向后兼容、缓存失效、可观测性、可维护性、测试、运维和文档。条件允许时验证迁移的两个方向。完成前解决重要发现，明确未验证项，并按开发工作流核对版本影响和同步结果。

@@ -1,11 +1,11 @@
 kuvibe:
-  version: 0.2.0
+  version: 0.3.2
   schema: 2
 templates:
   agents-router: 1
-  requirement-workflow: 1
-  development-workflow: 1
+  requirement-workflow: 2
+  development-workflow: 2
   review-workflow: 1
   documentation-workflow: 1
 initializedAt: 2026-09-07T12:53:58+08:00
-lastUpdatedAt: 2026-09-07T12:53:58+08:00
+lastUpdatedAt: 2026-09-15T23:15:35+08:00

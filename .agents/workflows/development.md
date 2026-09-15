@@ -1,11 +1,21 @@
-# Development Workflow
+# 开发工作流
 
-<!-- kuvibe: template=development-workflow revision=1 ownership=kuvibe -->
+<!-- kuvibe: template=development-workflow revision=2 ownership=mixed -->
 
-1. Confirm requirement and acceptance artifacts are current and blocking decisions are resolved.
-2. Inspect existing conventions and write the smallest coherent implementation plan.
-3. Implement migrations and domain rules before thin controller mappings when persistence is involved.
-4. Preserve compatibility unless an approved plan says otherwise; isolate external-client adapters from domain entities.
-5. Add behavior-focused unit, integration, contract, and e2e tests in proportion to risk.
-6. Run focused verification, then broader static/build checks. Update Swagger and affected current documentation.
-7. Review the diff and consolidate completed active artifacts into one implemented note.
+1. 确认需求和验收产物有效、阻塞决策已解决，加载项目语言、版本约定及实现惯例，写出最小完整计划。
+2. 涉及持久化时先实现适用的迁移和领域规则，再实现薄控制器映射；保留当前任务已明确批准的部署方建表等例外。
+3. 除已批准的变更外保持兼容，隔离外部客户端适配与领域实体，避免无关重构。
+4. 按风险增加行为导向的单元、集成、契约和 e2e 验证；先运行聚焦检查，再运行必要的静态/构建检查，报告未验证项。
+5. 更新 Swagger 和受影响的当前文档，审查差异并解决重要发现，逐项确认验收。
+6. 将本次已完成范围的 active 产物合并为一篇 implemented 工程笔记，移除已完成目录；保留仍有未完成里程碑的目录及历史笔记。
+
+## 需求完成时的版本影响
+
+- 实现、验收、审查和文档检查通过后，按 `kuVibe.md` §30.1 对整个需求评估一次；保存、单次提交或重复完成检查不触发递增。
+- 先读 `.agents/project.md` 的版本来源、包同步范围和 pre-1.0 约定；无产品版本或既有流程延后递增时记录 N/A 或 deferred 及证据，不强行套用 KuVibe 发布规则。
+- 按对外行为、能力和契约取最高语义影响：`none` 无发布可见变化；`patch` 兼容修复、性能、文档/提示词纠正或内部重构；`minor` 新增兼容能力或可选工作流/配置；`major` 不兼容行为、契约、支持范围或结构迁移。有效递增另按项目 pre-1.0 规则判断，保留破坏性说明。
+- 写版本前在计划或笔记记录变更集标识、原始基线、目标、语义/有效影响、理由、schema 决定及受影响版本来源。SemVer 用整数运算，保留预发布流程；重试复用原基线/目标，范围扩大从原基线重算，不重复递增或追加 CHANGELOG。
+- 版本来源出现并发改动或既不匹配基线也不匹配目标时先核对归属；同步所需清单、内部依赖、锁元数据、发布元数据和 CHANGELOG，保留无关待发布条目。
+- schema 仅在必需文件、路径、职责或生命周期发生结构契约变化时独立递增，并要求显式连续迁移；模板 revision 独立评估。消费项目的普通产品变更不修改 KuVibe 安装状态；协议刷新应用协议指定 revision。
+- KuVibe 升级先验证候选文件及保留要求，再写升级笔记，最后更新安装状态与 `lastUpdatedAt`，保留 `initializedAt`。验证失败不推进安装状态，不宣称完成，保留原基线/目标供修复重试。
+- 最终核对需求、验收、审查、文档影响、工程笔记、版本影响、发布同步、schema/revision、CHANGELOG 及版本一致性；不适用项写明理由。版本递增不授权 Git 提交、标签、包发布或托管 release。

@@ -1,9 +1,11 @@
-# Requirement Workflow
+# 需求工作流
 
-<!-- kuvibe: template=requirement-workflow revision=1 ownership=kuvibe -->
+<!-- kuvibe: template=requirement-workflow revision=2 ownership=mixed -->
 
-1. Read KuVibe state, project context, stack context, relevant current docs, source, and active artifacts.
-2. Normalize outcome, actors, preconditions, main flow, edge/error behavior, exclusions, constraints, assumptions, and acceptance signals.
-3. Classify completeness as complete, assumable, or incomplete. Ask only about decisions that materially change behavior, data, security, compatibility, or acceptance.
-4. Record Level 2–3 requirements under `.agents/notes/active/<slug>/requirement.md` before implementation.
-5. Keep public API details in Swagger/OpenAPI; requirement artifacts capture intent and decisions, not duplicated reference documentation.
+1. 先阅读 `kuVibe.md` 元数据和 `.agents/kuvibe.yaml`，按协议 §4 判断采用、迁移、刷新或维护；schema 优先，SemVer 按整数比较。状态无效、不一致或版本不受支持时停止版本写入；仅执行官方连续迁移，保留现有知识和用户改动。
+2. 阅读项目和技术栈上下文，加载项目语言及版本约定，再检索相关当前文档、实现笔记、源代码和进行中产物。
+3. 明确目标、参与者、前置条件、主流程、边界/错误行为、非目标、约束、假设和可观察验收信号。
+4. 将完整度判为 `complete`、`assumable` 或 `incomplete`。低风险假设记录后继续，仅澄清会改变业务、数据、安全、兼容性或验收的缺失决策。
+5. 按意图、范围和风险选择复杂度：Level 0 分析/实现/验证；Level 1 增加计划和文档影响；Level 2 多视角分析及验收产物；Level 3 重大安全、破坏性契约或架构迁移先研究、形成方案并获得批准。仅选择相关能力，不强制固定角色或多 Agent。
+6. Level 2–3 在实现前将需求、分析、验收和计划写入 `.agents/notes/active/<slug>/`，采用项目语言，不隐式翻译既有产物。
+7. 公共 API 详情以 Swagger/OpenAPI 为准；需求产物记录意图和决策，不重复维护接口手册。完成时执行开发工作流的版本影响与完成检查。

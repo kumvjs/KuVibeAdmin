@@ -1,6 +1,4 @@
 import cluster from 'node:cluster'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import FastifyStatic from '@fastify/static'
 import { HttpStatus, Logger, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -18,6 +16,7 @@ import {
   isMainProcess,
 } from './config/index.js'
 import { LoggerService } from './shared/logger/logger.service.js'
+import { prepareStaticRoot } from './static-assets.js'
 
 declare const module: any
 
@@ -47,26 +46,14 @@ async function bootstrap() {
   })
 
   app.setGlobalPrefix(globalPrefix)
-  // In development this module lives under `src/`; after `nest build` it is
-  // emitted under `dist/src/`. Resolve both layouts so Fastify never receives
-  // a non-existent static root.
-  const staticRootCandidates = [
-    path.resolve(import.meta.dirname, '..', 'public'),
-    path.resolve(import.meta.dirname, '..', '..', 'public'),
-    path.resolve(process.cwd(), 'public'),
-  ]
-  const staticRoot = staticRootCandidates.find(candidate => existsSync(candidate))
-  if (staticRoot) {
-    // Nest 12 的 useStaticAssets 将模块命名空间传给 Avvio，导致 ready 无法完成。
-    // 显式传入插件函数，保持静态资源注册与端口监听的生命周期正常。
-    app.register(FastifyStatic, {
-      root: staticRoot,
-      allowedPath: pathname => !/^\/?uploads(?:\/|$)/.test(pathname),
-    })
-  }
-  else {
-    console.warn(`[BOOT] static assets directory not found; checked: ${staticRootCandidates.join(', ')}`)
-  }
+  // public 固定在应用根目录，与 dist 同级；首次启动自动创建。
+  const staticRoot = await prepareStaticRoot(import.meta.dirname)
+  // Nest 12 的 useStaticAssets 将模块命名空间传给 Avvio，导致 ready 无法完成。
+  // 显式传入插件函数，保持静态资源注册与端口监听的生命周期正常。
+  app.register(FastifyStatic, {
+    root: staticRoot,
+    allowedPath: pathname => !/^\/?uploads(?:\/|$)/.test(pathname),
+  })
   // Starts listening for shutdown hooks
   app.enableShutdownHooks()
 

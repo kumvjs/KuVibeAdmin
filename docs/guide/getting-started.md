@@ -63,7 +63,7 @@ pnpm start:prod
 
 启动完成应看到 `Server running on http://127.0.0.1:7001`（端口由 `APP_PORT` 决定）。`Nest application successfully started` 仅表示 Nest 初始化完成，不能单独作为端口可访问的依据。可访问 `/api-docs`（启用 Swagger 时）验证 HTTP 服务；非生产环境启用 Playground 时也可请求 `/api/status`。
 
-本项目通过显式导入并注册 `@fastify/static` 提供静态资源，规避当前 Nest 12 `useStaticAssets()` 传递模块命名空间导致启动挂起的问题。保留静态根目录检查及 `/uploads` 访问限制。
+本项目通过显式导入并注册 `@fastify/static` 提供静态资源，规避当前 Nest 12 `useStaticAssets()` 传递模块命名空间导致启动挂起的问题。保留 `/uploads` 访问限制。静态目录固定为 `packages/core/public`（部署时为应用根目录下的 `public`），与 `dist` 同级，不随构建清理；无需配置，首次启动自动创建。入口为 `src/main.ts`、`dist/main.js` 或 `dist/src/main.js` 时均定位到同一目录，不使用启动工作目录兜底。输出布局由 TypeScript/CLI 配置决定，当前 `rootDir: "./"` 对应 `dist/src/main.js`，本地 watch 同样运行编译产物。系统附件仍由上传模块在 `var/attachments` 下按需创建，不能放进公开静态目录。
 
 ## 启动文档站
 

@@ -89,11 +89,12 @@ Acceptance: timezone is per-user and durable across processes/devices; invalid z
 
 ## M7 — Optional full-playground parity
 
-- [ ] Implement `POST /upload` only after selecting storage, object naming, content/size limits, URL policy, malware handling, ownership, cleanup, and optional metadata persistence.
-- [ ] Implement `GET /table/list` only if the generic table demo remains; use deterministic fixture data rather than a fake domain table.
-- [ ] Implement `GET /demo/bigint` as a fixed serialization fixture only if the demo remains.
-- [ ] Implement `GET /status` only in development/test environments.
-- [ ] Do not implement mock-only `GET /test` or `POST /test` in production.
+- [x] Fix upload configuration injection to use `APP_CONFIG.KEY` and cover actual Nest module dependency resolution with a regression test.
+- [x] Implement authenticated `POST /upload` as a non-production local temporary-image adapter using the existing multipart/static stack, random object names, a 6 MiB limit, MIME/signature checks, public URLs, 24-hour cleanup, no metadata table, and no production route/static exposure.
+- [x] Implement authenticated `GET /table/list` with deterministic fixture data and no fake product table.
+- [x] Implement authenticated `GET /demo/bigint` as a fixed raw-JSON serialization fixture with no table.
+- [x] Implement public `GET /status` only through the non-production Playground module, defaulting to HTTP 200 for the params-serializer demo.
+- [x] Do not implement mock-only `GET /test` or `POST /test`.
 
 Acceptance: retained examples serve an explicit frontend demo, introduce no fake production domain, and expose no diagnostic behavior in production.
 

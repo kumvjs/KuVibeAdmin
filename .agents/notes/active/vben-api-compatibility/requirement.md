@@ -32,3 +32,4 @@ Establish the authoritative Vben API scope and implement the versioned backlog i
 - The existing role-based RBAC remains the preferred authorization model.
 - M5 resolves the upstream user `permissions` ambiguity in favor of the existing RBAC model: management requests use explicit `roleIds`, and no direct per-user menu grants are persisted.
 - The deployment owner will create the redesigned user tables directly. M5 must not generate a migration or retain legacy MD5 rows in the fresh schema.
+- M7 is playground-only: its module and temporary uploads are unavailable in production, and demonstration data must not become a business table or managed asset domain.

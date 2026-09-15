@@ -26,7 +26,7 @@ export const DATABASE_TYPES = [
 ] as const
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
-    .valid('development', 'production', 'local')
+    .valid('development', 'production', 'local', 'test')
     .default('development'),
 
   APP_BASE_URL: Joi.string()
@@ -61,7 +61,7 @@ export const envValidationSchema = Joi.object({
   TYPEORM_USERNAME: Joi.string().required(),
   TYPEORM_PASSWORD: Joi.string().required(),
   TYPEORM_DATABASE: Joi.string().required(),
-  TYPEORM_SCHEMA: Joi.string().optional(),
+  TYPEORM_SCHEMA: Joi.string().empty('').optional(),
   TYPEORM_SYNCHRONIZE: Joi.boolean().default(false),
 
   REDIS_HOST: Joi.string().required(),

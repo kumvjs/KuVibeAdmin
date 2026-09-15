@@ -49,6 +49,11 @@ app.getHttpAdapter().getInstance().addHook('onRequest', (request, reply, done) =
 
   const { url } = request
 
+  // Playground uploads are temporary development artifacts. Even if a
+  // deployment accidentally reuses that directory, never expose it in production.
+  if (process.env.NODE_ENV === 'production' && /^\/uploads(?:\/|$)/.test(url))
+    return reply.code(404).send()
+
   if (url.endsWith('.php')) {
     reply.raw.statusMessage
       = 'Eh. PHP is not support on this machine. Yep, I also think PHP is bestest programming language. But for me it is beyond my reach.'

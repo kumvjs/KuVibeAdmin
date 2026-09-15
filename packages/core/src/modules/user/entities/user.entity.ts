@@ -39,18 +39,18 @@ export class SysUserEntity extends CommonEntity {
   @Column({ default: 1, name: 'session_version', type: 'integer' })
   sessionVersion: number
 
-  @Column({ length: 500, nullable: true })
-  avatar?: string | null
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  avatar: string | null
 
-  @Column({ length: 255, name: 'home_path', nullable: true })
-  homePath?: string | null
+  @Column({ type: 'varchar', length: 255, name: 'home_path', nullable: true })
+  homePath: string | null
 
-  @Column({ length: 500, nullable: true })
-  description?: string | null
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  description: string | null
 
   @Column({ name: 'dept_id', type: 'bigint', nullable: true })
   @Index('idx_sys_user_dept_id')
-  deptId?: string | null
+  deptId: string | null
 
   @ApiHideProperty()
   @ManyToOne(() => SysDeptEntity, {
@@ -58,13 +58,13 @@ export class SysUserEntity extends CommonEntity {
     onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'dept_id' })
-  dept?: Relation<SysDeptEntity> | null
+  dept: Relation<SysDeptEntity> | null
 
-  @Column({ length: 255, nullable: true })
-  remark?: string | null
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  remark: string | null
 
-  @Column({ length: 64, nullable: true })
-  timezone?: string | null
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  timezone: string | null
 
   @Column({ default: UserStatus.ENABLED, type: 'smallint' })
   @Index('idx_sys_user_status')

@@ -1,6 +1,6 @@
 # Vben Admin 对接
 
-项目的接口命名已覆盖 Vben 登录流程和动态菜单所需的基本元素，但并非开箱即用的完整 Vben 服务端。前端需要配置响应解包、Cookie 和刷新逻辑；后端仍需补齐系统管理 CRUD 等接口。
+项目后端已覆盖 Vben 登录、动态菜单、系统管理和非生产 Playground 演示接口。前端仍需配置响应解包、Cookie、刷新逻辑和用户表单字段；M6 时区偏好尚未实现。
 
 ## OpenAPI-TS 快速对接
 
@@ -246,9 +246,15 @@ Vben v5.7.0 用户页可使用 `GET /system/user/list` 及用户 POST、PUT、DE
 
 用户表由部署方依据实体直接新建，不执行迁移，也不保留 MD5/`psalt` 数据。若已有旧环境需要保留用户，必须单独设计经审核的数据迁移和强制重置流程，不能把旧哈希直接复制到新表。
 
-### 尚缺接口
+### Playground 演示接口
+
+M7 已对齐锁定版 Vben 的 `/table/list`、`/upload`、`/demo/bigint` 和 `/status`。这些路由只在 local/development/test 环境存在；生产环境不注册模块。表格使用固定 fixture，bigint 接口刻意返回原始超长数字 JSON，status 接口默认 200 并允许通过 `status` 查询参数模拟 200–599。
+
+上传接口要求 Access Token，表单字段固定为 `file`，仅接受不超过 6 MiB 且 MIME/魔数一致的 JPEG、PNG、WebP。返回 URL 指向本地临时静态文件，保留 24 小时；它只适合单机 Playground，不应作为生产对象存储。上游 mock-only 的 GET/POST `/test` 不提供。
+
+### 尚缺适配
 
 - 用户表单的前端 `username/password/roleIds` 字段适配；
-- 文件上传等 Vben 常用管理接口。
+- M6 用户时区偏好接口。
 
 建议先固定 Vben 所用版本及其 mock API 契约，再以契约测试逐个补齐，避免仅凭路径名称适配。

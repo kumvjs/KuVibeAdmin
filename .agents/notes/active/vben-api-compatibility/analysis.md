@@ -74,12 +74,12 @@ The menu form can submit `type`, `name`, `pid`, `meta.title`, `path`, `activePat
 
 | Method | Path | Decision |
 | --- | --- | --- |
-| GET | `/table/list` | Optional full-playground parity; use fixture data, not a fake product table |
-| POST | `/upload` | Implement only against real storage and validation; return `{ url }` |
-| GET | `/demo/bigint` | Fixed contract fixture; no table |
-| GET | `/status?status=...` | Development/test only; disable in production |
+| GET | `/table/list` | Implemented in M7 with deterministic in-memory fixtures; no fake product table |
+| POST | `/upload` | Implemented in M7 as authenticated, temporary local raster-image storage outside production; returns `{ url }` |
+| GET | `/demo/bigint` | Implemented in M7 as an authenticated fixed raw-JSON contract fixture; no table |
+| GET | `/status?status=...` | Implemented in M7 as a public non-production status simulator |
 
-`GET /test` and `POST /test` are mock-only diagnostics and are not frontend contracts. The download example calls an external static URL and is not a local backend endpoint.
+`GET /test` and `POST /test` are mock-only diagnostics and are not implemented. The download example calls an external static URL and is not a local backend endpoint. All retained M7 routes are registered by a dedicated Playground module only when `NODE_ENV` is not production; production additionally refuses `/uploads/*` static access. The local upload adapter accepts one JPEG/PNG/WebP image up to 6 MiB, identifies content by magic bytes, assigns a UUID filename, exposes it under `/uploads`, and removes artifacts older than 24 hours. It intentionally has no metadata table or deletion API because it is not a managed asset domain.
 
 ## Contract gaps in the existing backend
 
@@ -94,7 +94,7 @@ The menu form can submit `type`, `name`, `pid`, `meta.title`, `path`, `activePat
 
 - Reuse `sys_user`, `sys_role`, `sys_menu`, `sys_user_role`, `sys_role_menu`, and `user_refresh_token`.
 - Add a self-referencing `sys_dept` table and an indexed department foreign key on `sys_user`.
-- Extend user/profile persistence for avatar, home path, description, timezone, and remark, choosing user columns versus a profile/preferences table before migration.
+- User/profile persistence directly stores avatar, home path, description, timezone, and remark on `sys_user`; M6 owns timezone validation and preference endpoints.
 - Model stable menu fields (`name`, `path`, `authCode`, `component`, `redirect`, `type`, `status`, `pid`) as columns. Prefer PostgreSQL JSONB for fast-moving Vben `meta`; promote only fields needing uniqueness, indexing, or domain queries.
 - Treat role `permissions` as menu/button IDs stored through `sys_role_menu` and replace mappings transactionally.
 - The official user demo also submits `permissions`, but this conflicts with the established user -> role -> menu model. Recommendation: keep role-based authorization and adapt the Vben user form to `roleIds`. If exact demo compatibility requires direct grants, first design `sys_user_menu` plus explicit union/override rules.

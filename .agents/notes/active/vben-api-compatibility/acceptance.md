@@ -166,3 +166,15 @@ Later implementation acceptance is defined per milestone in `plan.md` and must b
 - [x] Disable/password-reset/delete revoke persisted Refresh Tokens and targeted Redis session state, while all updates invalidate user-info and effective-permission caches after commit.
 - [x] Access validation rejects disabled users, refresh validates persisted status/session version, and serializable last-super checks preserve at least one enabled super-administrator path.
 - [x] Soft delete removes user-role mappings and allows intentional username reuse only for a new user ID; audit fields continue through the shared subscriber.
+
+## Completed batch: M7
+
+- [x] The real Playground module compiles with globally registered app configuration; the upload service injects `APP_CONFIG.KEY`, not the configuration factory. Regression test reproduced the startup exception before the fix and passes afterward.
+- [x] A dedicated Playground module exposes exactly the four locked frontend contracts outside production and is not registered when `NODE_ENV=production`.
+- [x] `GET /table/list` requires authentication, validates bounded pagination/sorting, returns deterministic `{ items,total }` fixtures, and creates no product table.
+- [x] `POST /upload` requires authentication and one `file`; only JPEG/PNG/WebP content with matching MIME and magic bytes up to 6 MiB is stored under a random name.
+- [x] Temporary images use the existing local static root, return an origin-based `/uploads/...` URL, expire after 24 hours, create no metadata table, and remain unavailable in production.
+- [x] `GET /demo/bigint` requires authentication and preserves the locked oversized integer literals through an explicit raw-JSON response boundary.
+- [x] `GET /status` is public only inside the non-production module, returns the requested HTTP status with the standard error envelope, and defaults to 200 so the params-serializer demo can inspect its response URL.
+- [x] Mock-only `GET /test` and `POST /test` are absent.
+- [x] Focused/full tests, test type-checking, changed-file ESLint, Nest build, locked Vben fixtures, docs, and diff checks pass proportionally.

@@ -64,7 +64,7 @@ initializedAt: <ISO-8601 timestamp with offset>
 lastUpdatedAt: <ISO-8601 timestamp with offset>
 ```
 
-Preserve `initializedAt` on upgrades. Update `lastUpdatedAt`, release, schema, and applied template revisions only after relevant validation succeeds. Metadata is system state, not a substitute for Git history or project documentation.
+Preserve `initializedAt` on upgrades. Update `lastUpdatedAt`, release, schema, and applied template revisions only after relevant validation succeeds. Metadata is system state, not a substitute for Git history or project documentation. Keep this file limited to KuVibe system metadata; Project Language and other project conventions belong in `.agents/project.md` or `.agents/context/conventions.md`, never in `.agents/kuvibe.yaml`.
 
 ### 4.2 Ownership and Modification Safety
 
@@ -112,6 +112,8 @@ After all steps pass, write one timestamped migration note and then update `.age
 
 ## 5. Greenfield Bootstrap
 
+Infer Project Language from the primary natural language of the first meaningful project requirement before clarification and technology selection, following section 10.1. Never require a language-selection step.
+
 Understand and normalize the project requirement, identify constraints, and resolve material ambiguity. If the stack is not already constrained, research currently maintained options and present exactly three: recommended, conservative alternative, and a specific-strength alternative. Explain maintenance, ecosystem, fit, deployment, performance, hiring, and project constraints. Ask the user to choose once, then persist the choice.
 
 If the technology is explicitly established, do not reopen selection.
@@ -119,6 +121,8 @@ If the technology is explicitly established, do not reopen selection.
 ## 6. Existing Project Bootstrap
 
 Treat the repository as evidence. Do not recommend a replacement stack. Probe manifests, lockfiles, build/framework config, root structure, then a small sample of entry files. Stop once confidence is sufficient.
+
+Before generating context, establish Project Language from a bounded sample of existing language conventions following section 10.1. Existing conventions take precedence over the current conversation language.
 
 ## 7. Stack Detection
 
@@ -136,6 +140,29 @@ Create `.agents/context/stack.md` with facts, language/runtime, frameworks, pers
 
 Create `.agents/project.md` containing the product, users, core domain, established stack, modules, repository shape, deployment, and important constraints. Keep only durable facts.
 
+### 10.1 Project Language Detection and Policy
+
+Project Language controls human-readable project artifacts, independently of programming language and the user's current conversation language. Establish it automatically during initialization:
+
+1. **Greenfield:** use the primary natural language of the first meaningful user requirement. Ignore or give very low weight to identifiers, copied logs, and English technical terms. For example, `做一个基于 NestJS + PostgreSQL 的 SaaS CRM，需要 RBAC 和 audit log。` establishes Simplified Chinese (`zh-CN`).
+2. **Existing project:** use this evidence order: explicit repository language conventions, predominant Markdown/docs language, recent Git commit descriptions, representative source comments, then current user input. Preserve established conventions even when the user speaks another language. Sample `README*`, `AGENTS.md`, docs entry pages and a few relevant docs; inspect only a few recent commits or representative comments if still needed. Exclude generated/vendor content and copied technical text. Preserve intentional localized documentation trees instead of counting translations as competing defaults. Stop as soon as evidence is sufficient; never read all docs, all source comments, or full Git history just for language detection. Unavailable Git or inconclusive repository evidence must not block initialization: continue down the evidence order and record any fallback.
+3. **Persist once:** write a Project Language section in `.agents/project.md`, or keep the authoritative section in `.agents/context/conventions.md` with a pointer from project context. Record primary language (name and language tag), source/evidence, scope, and any established exceptions. Use ordinary Markdown, not fields in `.agents/kuvibe.yaml`. Do not duplicate competing policy definitions. For an existing harness missing this section, infer and merge it once using the same evidence order without re-bootstrap, replacing existing context, or changing schema.
+4. **Apply:** use the established language for generated project-facing prose in `AGENTS.md`, project/context/workflow Markdown, business and architecture docs, engineering notes, agent plans (including `plan.md`), requirements, analyses, acceptance/review artifacts, test descriptions, code comments, Git commit subjects/bodies, PR/Issue descriptions, and persisted development summaries. Render generated template headings and explanatory prose in that language; template source language is not a project convention. Preserve existing files and localized docs. In existing source, preserve stable local comment conventions. Record finer-grained documentation/comment/commit or path exceptions only when supported by stable repository evidence or an explicit user instruction; otherwise use one primary language.
+5. **Keep technical forms:** do not translate identifiers, class/function/variable names, API paths, JSON/config keys, database fields, package/framework names, CLI commands, protocol names, official technical terminology, standard quotations, or externally required terms. Preserve machine-readable metadata, managed markers, and canonical filenames. Keep Conventional Commit types/scopes and syntax (such as `feat:` and `fix:`); use Project Language for their descriptions. Engineering-note filenames retain `YYYYMMDD-HHmm-TYPE-SLUG.md` with ASCII/English type and slug, while titles and bodies use Project Language.
+6. **Reuse:** future sessions read this context before creating artifacts. Do not redetect or change it for ordinary requirements, incidental language switches, English logs, or pasted API documentation. Change it only on an explicit user request to change project conventions; update the authoritative context and record a durable decision, applying only the requested scope. Do not bulk-translate existing docs or rewrite historical notes/commits implicitly.
+7. **Communicate separately:** respond to the user in their current language. Project artifacts, including saved agent plans and summaries, follow Project Language and its recorded exceptions. A request for a one-off translation does not change the durable convention.
+
+Example project-context section (write its human-readable labels in the detected language):
+
+```markdown
+## 项目语言
+
+主要语言：简体中文（zh-CN）
+来源：首次有效项目需求；中文句子中的 NestJS、RBAC 等术语不影响判断。
+适用范围：项目文档、上下文、计划、工程笔记、测试说明、生成的注释、提交说明和 PR / Issue 描述。
+例外：无。技术标识符、机器元数据和 ASCII 文件名保持原样。
+```
+
 ## 11. Agent Adapter Generation
 
 Create a concise `AGENTS.md` router that tells future agents what context and workflow to read. Other environment adapters must be thin pointers; never duplicate the protocol across many files.
@@ -147,6 +174,8 @@ For every non-trivial request, identify the intended outcome, affected users/mod
 ## 13. Context Retrieval
 
 Read project context, relevant module docs, relevant implemented notes, and only the source/tests needed for the request. Retrieve before clarifying.
+
+Load the persisted Project Language and any referenced conventions before writing project artifacts; apply section 10.1 without redetecting an established language.
 
 ## 14. Requirement Completeness
 

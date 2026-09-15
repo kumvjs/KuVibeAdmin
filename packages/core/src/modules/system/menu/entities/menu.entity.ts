@@ -27,23 +27,27 @@ export class SysMenuEntity extends CommonEntity {
   @Index('uq_sys_menu_name', { unique: true, where: '"deleted_at" IS NULL' })
   name: string
 
-  @Column({ length: 100, nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   @Index('uq_sys_menu_path', { unique: true, where: '"deleted_at" IS NULL' })
-  path?: string | null
+  path: string | null
 
-  @Column({ name: 'auth_code', length: 255, nullable: true })
+  @Column({ type: 'varchar', name: 'auth_code', length: 255, nullable: true })
   @Index('uq_sys_menu_auth_code', { unique: true, where: '"deleted_at" IS NULL' })
-  authCode?: string | null
+  authCode: string | null
 
   @Column({ length: 20, type: 'varchar', default: MenuType.MENU })
   @Index('idx_sys_menu_type')
   type: MenuType
 
-  @Column({ length: 255, nullable: true })
-  component?: string | null
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  component: string | null
 
-  @Column({ length: 100, nullable: true })
-  redirect?: string | null
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  redirect: string | null
 
   @Column({ default: () => '\'{}\'::jsonb', type: 'jsonb' })
   meta: MenuMeta

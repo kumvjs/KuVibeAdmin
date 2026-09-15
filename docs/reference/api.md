@@ -30,6 +30,10 @@
 | `POST` | `/system/user` | JWT + `system:user:create` | 新增用户并分配角色，返回 boolean |
 | `PUT` | `/system/user/:id` | JWT + `system:user:update` | 局部修改用户、角色或重置密码，返回 boolean |
 | `DELETE` | `/system/user/:id` | JWT + `system:user:delete` | 撤销会话并软删除用户，返回 boolean |
+| `GET` | `/table/list` | JWT；仅非生产环境 | 返回确定性的 Vben 演示表格 `{ items,total }` |
+| `POST` | `/upload` | JWT；仅非生产环境 | 上传一张临时 JPEG/PNG/WebP 图片，返回 `{ url }` |
+| `GET` | `/demo/bigint` | JWT；仅非生产环境 | 返回包含超长 JSON 数字字面量的固定测试响应 |
+| `GET` | `/status` | 公开；仅非生产环境 | 模拟查询参数指定的 HTTP 状态码，缺省为 200 |
 
 `AiController` 和 `CacheController` 当前没有路由，不能作为可用 API。系统模块已发布部门、角色与菜单管理路径；菜单模块还提供运行时 `/menu/all`。
 
@@ -111,6 +115,18 @@ Content-Type: application/json
 `DELETE /api/system/user/:id` 先删除 Refresh Token 和用户角色关系，再软删除用户并清理缓存。用户名唯一索引只覆盖未软删除记录，因此可由一个全新用户 ID 重新使用。系统拒绝停用、删除或移除最后一个启用 super 用户的 super 角色。
 
 用户密码表只接受 `password_algorithm=argon2id` 与 `$argon2id$...` PHC 字符串，并保存正数 `session_version`。本批不生成迁移；部署方按实体直接创建新表，不迁移 MD5/`psalt` 或旧冗余 role 字段。
+
+## Playground 演示接口
+
+`PlaygroundModule` 只在 `NODE_ENV` 非 `production` 时注册。生产环境不存在 `/table/list`、`/upload`、`/demo/bigint`、`/status` 路由，并会显式拒绝 `/uploads/*` 静态访问。`GET/POST /test` 属于上游 mock 诊断接口，本项目不实现。
+
+`GET /api/table/list` 支持 `page/pageSize/sortBy/sortOrder`，分页限制为每页最多 100 条，排序字段使用白名单。它返回固定的 100 条演示数据，进程重启后内容不变，不查询或创建业务数据库表。
+
+`POST /api/upload` 接收且只接收 multipart 字段 `file`。文件不得超过 6 MiB，只允许 MIME 与文件魔数一致的 JPEG、PNG 或 WebP；原文件名不会用于磁盘路径。文件以 UUID 名称写入本地 `public/uploads/<UTC年>/<UTC月>`，URL 位于 API origin 的 `/uploads/...`，24 小时后由启动/上传时清理。它是公开 URL 的临时单机演示存储，没有元数据、所有权管理或删除 API，也没有病毒扫描；生产资产应另行选择对象存储、鉴权、内容扫描和生命周期策略。
+
+`GET /api/demo/bigint` 为验证 Vben `json-bigint` 转换而保留原始 JSON 响应，两个 `id` 以超出 JavaScript 安全整数范围的数字字面量发送，不经过普通 JSON 对象序列化。除此之外，项目 JSON 接口仍使用统一 `ResOp<T>` 转换。
+
+`GET /api/status?status=401` 使用标准错误信封和指定 HTTP 状态；不传 `status` 时返回 HTTP 200，以支持上游参数序列化页面只读取 `responseURL` 的用法。状态值限制为 200–599。
 
 ## Swagger
 

@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { stdin, stdout } from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { Writable } from 'node:stream'
+import { parse } from 'dotenv'
 import dataSource, { dataSourceOptions } from '../config/database.config.js'
 import { Roles } from '../modules/auth/auth.constant.js'
 import { SysRoleEntity } from '../modules/system/role/entities/role.entity.js'
@@ -18,7 +19,7 @@ const SECRET_KEYS = ['JWT_SECRET', 'REFRESH_TOKEN_SECRET'] as const
 
 function setEnvValue(content: string, key: string, value: string): string {
   const lineEnding = content.includes('\r\n') ? '\r\n' : '\n'
-  const pattern = new RegExp(`^(\\s*${key}\\s*=\\s*).*$`, 'm')
+  const pattern = new RegExp(`^([\\t ]*(?:export[\\t ]+)?${key}[\\t ]*=[\\t ]*).*$`, 'gm')
 
   if (pattern.test(content)) {
     return content.replace(pattern, (_, prefix: string) => `${prefix}${value}`)
@@ -30,12 +31,23 @@ function setEnvValue(content: string, key: string, value: string): string {
 
 async function writeJwtSecrets(envPath: string): Promise<void> {
   let envContent = await readFile(envPath, 'utf8')
+  const values = parse(envContent)
+  const generated: string[] = []
 
   for (const key of SECRET_KEYS) {
+    if (values[key]?.trim() || process.env[key]?.trim())
+      continue
     envContent = setEnvValue(envContent, key, randomBytes(48).toString('base64url'))
+    generated.push(key)
   }
 
-  await writeFile(envPath, envContent, 'utf8')
+  if (generated.length > 0) {
+    await writeFile(envPath, envContent, 'utf8')
+    stdout.write(`Generated ${generated.join(', ')} in ${envPath}; existing secrets were preserved.${EOL}`)
+  }
+  else {
+    stdout.write(`JWT secrets are already configured; no changes were made.${EOL}`)
+  }
 }
 
 async function createSuper(username: string, password: string): Promise<void> {
@@ -57,8 +69,8 @@ async function createSuper(username: string, password: string): Promise<void> {
       withDeleted: true,
     })
 
-    if (superRole?.deletedAt) {
-      throw new Error('The super role exists but has been deleted. Restore it before initialization.')
+    if (superRole && (superRole.deletedAt || superRole.status !== RoleStatus.ENABLED)) {
+      throw new Error('The super role is deleted or disabled. Restore and enable it before initialization.')
     }
 
     if (!superRole) {
@@ -95,6 +107,37 @@ async function main(): Promise<void> {
   stdout.write(`Environment: ${environment}${EOL}`)
   stdout.write(`Database type: ${String(dataSourceOptions.type)}${EOL}`)
 
+  try {
+    await dataSource.initialize()
+    const existingSuper = await dataSource.getRepository(SysUserRoleEntity)
+      .createQueryBuilder('userRole')
+      .innerJoinAndSelect('userRole.user', 'user')
+      .innerJoinAndSelect('userRole.role', 'role')
+      .where('role.code = :code', { code: Roles.SUPER })
+      .getOne()
+    if (existingSuper) {
+      stdout.write(`A user with the super role already exists: "${existingSuper.user.username}". Initialization skipped.${EOL}`)
+      return
+    }
+
+    const superRole = await dataSource.getRepository(SysRoleEntity).findOne({
+      where: { code: Roles.SUPER },
+      withDeleted: true,
+    })
+    if (superRole && (superRole.deletedAt || superRole.status !== RoleStatus.ENABLED)) {
+      stdout.write(`The super role is deleted or disabled. Restore and enable it before initialization.${EOL}`)
+      return
+    }
+
+    await promptForSuper(envPath)
+  }
+  finally {
+    if (dataSource.isInitialized)
+      await dataSource.destroy()
+  }
+}
+
+async function promptForSuper(envPath: string): Promise<void> {
   let hideInput = false
   const mutedOutput = new Writable({
     write(chunk, encoding, callback) {
@@ -122,33 +165,46 @@ async function main(): Promise<void> {
   }
 
   try {
-    const username = (await readline.question('Super username: ')).trim()
-    if (username.length < 4)
-      throw new Error('Super username must contain at least 4 characters.')
-    if (username.length > 100)
-      throw new Error('Super username cannot exceed 100 characters.')
+    let username: string
+    while (true) {
+      username = (await readline.question('Super username: ')).trim()
+      if (username.length < 5 || username.length > 100) {
+        stdout.write(`Super username must contain 5–100 characters.${EOL}`)
+        continue
+      }
+      const existingUser = await dataSource.getRepository(SysUserEntity).findOne({
+        where: { username },
+        withDeleted: true,
+      })
+      if (existingUser) {
+        stdout.write(`User "${username}" already exists. Choose another username.${EOL}`)
+        continue
+      }
+      break
+    }
 
-    const password = await askPassword('Super password: ')
-    if (password.length < 12)
-      throw new Error('Super password must contain at least 12 characters.')
-    if (password.length > 128)
-      throw new Error('Super password cannot exceed 128 characters.')
+    let password: string
+    while (true) {
+      password = await askPassword('Super password: ')
+      if (password.length < 6 || password.length > 128) {
+        stdout.write(`Super password must contain 6–128 characters.${EOL}`)
+        continue
+      }
+      const confirmation = await askPassword('Confirm password: ')
+      if (password !== confirmation) {
+        stdout.write(`Passwords do not match. Please enter the password again.${EOL}`)
+        continue
+      }
+      break
+    }
 
-    const confirmation = await askPassword('Confirm password: ')
-    if (password !== confirmation)
-      throw new Error('Passwords do not match.')
-
-    await dataSource.initialize()
     await createSuper(username, password)
     await writeJwtSecrets(envPath)
 
     stdout.write(`Framework initialization completed.${EOL}`)
-    stdout.write(`JWT secrets were written to ${envPath}.${EOL}`)
   }
   finally {
     readline.close()
-    if (dataSource.isInitialized)
-      await dataSource.destroy()
   }
 }
 

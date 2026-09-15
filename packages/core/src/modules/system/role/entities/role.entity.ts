@@ -17,8 +17,8 @@ export class SysRoleEntity extends CommonEntity {
   @Index('uq_sys_role_code', { unique: true })
   code: string
 
-  @Column({ length: 255, nullable: true })
-  remark?: string | null
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  remark: string | null
 
   @Column({ type: 'smallint', default: RoleStatus.ENABLED })
   @Index('idx_sys_role_status')

@@ -35,8 +35,12 @@ export class SysDeptEntity extends CommonEntity {
   @Index('idx_sys_dept_status')
   status: DeptStatus
 
-  @Column({ length: 50, nullable: true })
-  remark?: string | null
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  remark: string | null
 
   @Column({ name: 'order_no', type: 'integer', default: 0 })
   @Index('idx_sys_dept_order_no')

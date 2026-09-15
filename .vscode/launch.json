@@ -8,7 +8,7 @@
       "name": "nest start:local",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}/packages/core",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "start:local",

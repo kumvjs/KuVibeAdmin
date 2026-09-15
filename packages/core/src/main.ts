@@ -1,6 +1,7 @@
 import cluster from 'node:cluster'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import FastifyStatic from '@fastify/static'
 import { HttpStatus, Logger, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { useContainer } from 'class-validator'
@@ -21,9 +22,7 @@ import { LoggerService } from './shared/logger/logger.service.js'
 declare const module: any
 
 async function bootstrap() {
-  console.error('[BOOT] before NestFactory.create')
   const app = fastifyApp
-  console.error('[BOOT] after NestFactory.create')
   const configService = app.get(ConfigService)
 
   const appConfig = app.get<AppConfig>(
@@ -35,7 +34,6 @@ async function bootstrap() {
     BROWSER_SECURITY_CONFIG.KEY,
     { strict: false },
   )
-  console.error(`[BOOT] config loaded port=${port} prefix=${globalPrefix}`)
 
   // class-validator 的 DTO 类中注入 nest 容器的依赖 (用于自定义验证器)
   useContainer(app.select(AppModule), { fallbackOnErrors: true })
@@ -59,7 +57,9 @@ async function bootstrap() {
   ]
   const staticRoot = staticRootCandidates.find(candidate => existsSync(candidate))
   if (staticRoot) {
-    app.useStaticAssets({
+    // Nest 12 的 useStaticAssets 将模块命名空间传给 Avvio，导致 ready 无法完成。
+    // 显式传入插件函数，保持静态资源注册与端口监听的生命周期正常。
+    app.register(FastifyStatic, {
       root: staticRoot,
       allowedPath: pathname => !/^\/?uploads(?:\/|$)/.test(pathname),
     })
@@ -95,19 +95,13 @@ async function bootstrap() {
 
   // app.useWebSocketAdapter(new RedisIoAdapter(app))
 
-  console.error('[BOOT] before setupSwagger')
   const printSwaggerLog = setupSwagger(app, configService)
-  console.error('[BOOT] after setupSwagger')
   // const printWsSwaggerLog = setupWsSwagger(app, configService)
   // asyncApi 2.0有bug 暂不实现
   // const printAsyncApiLog = await setupAsyncApi(app, configService)
 
-  console.error('[BOOT] before app.listen')
-  // Use the Promise API.  Passing a callback through Nest's Fastify adapter
-  // can leave `app.listen()` pending with Fastify 5/Nest 12, even though Nest
-  // has already emitted "Nest application successfully started".
+  // 监听成功后再输出服务地址；Nest 的初始化成功日志不代表端口已经监听。
   await app.listen(port, '0.0.0.0')
-  console.error('[BOOT] listen resolved')
   app.useLogger(new LoggerService())
   const url = await app.getUrl()
   const { pid } = process
@@ -121,8 +115,6 @@ async function bootstrap() {
     const logger = new Logger('NestApplication')
     logger.log(`[${prefix + pid}] Server running on ${url}`)
   }
-
-  console.error('[BOOT] after app.listen')
 }
 try {
   // eslint-disable-next-line antfu/no-top-level-await

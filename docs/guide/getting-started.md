@@ -61,6 +61,10 @@ pnpm start:prod
 
 按示例配置，服务地址为 `http://localhost:7001`，业务 API 默认位于 `/api`。若启用 Swagger，界面默认位于 `http://localhost:7001/api-docs`。
 
+启动完成应看到 `Server running on http://127.0.0.1:7001`（端口由 `APP_PORT` 决定）。`Nest application successfully started` 仅表示 Nest 初始化完成，不能单独作为端口可访问的依据。可访问 `/api-docs`（启用 Swagger 时）验证 HTTP 服务；非生产环境启用 Playground 时也可请求 `/api/status`。
+
+本项目通过显式导入并注册 `@fastify/static` 提供静态资源，规避当前 Nest 12 `useStaticAssets()` 传递模块命名空间导致启动挂起的问题。保留静态根目录检查及 `/uploads` 访问限制。
+
 ## 启动文档站
 
 ```bash

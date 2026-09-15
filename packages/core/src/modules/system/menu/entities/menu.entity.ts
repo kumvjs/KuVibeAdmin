@@ -49,7 +49,7 @@ export class SysMenuEntity extends CommonEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   redirect: string | null
 
-  @Column({ default: () => '\'{}\'::jsonb', type: 'jsonb' })
+  @Column({ default: {}, type: 'jsonb' })
   meta: MenuMeta
 
   @Column({ type: 'smallint', default: MenuStatus.ENABLED })

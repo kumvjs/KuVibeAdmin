@@ -21,15 +21,19 @@ pnpm install
 
 ## 准备数据库
 
-先构建代码，再生成和运行迁移。执行 TypeORM CLI：
+在 `packages/core` 目录执行迁移命令；`generate`、`run`、`show`、`revert` 会先构建代码，保证 CLI 读取最新实体和迁移文件：
 
 ```bash
-pnpm build
-pnpm migration:generate
+cd packages/core
+pnpm migration:show
 pnpm migration:run
 ```
 
-当前仓库中的 `1780416958755-initData.ts` 是空迁移，不能独立创建全部表。首次使用时需要根据实体生成迁移；生产环境不要启用 `TYPEORM_SYNCHRONIZE`。
+`1780416958755-initData.ts` 是空迁移，基础表由后续的 `1789459958471-update-table.ts` 创建。实体变更后执行 `pnpm migration:generate`，审查生成的 SQL，再执行 `pnpm migration:run`；部署已有迁移时无需再次生成。生产环境不要启用 `TYPEORM_SYNCHRONIZE`。
+
+`migration:generate` 比较实体与连接数据库中的实际结构，迁移历史表仅用于判断哪些迁移已经执行。`TYPEORM_SCHEMA` 留空或不设置时使用连接默认 schema（通常为 `public`）；指定 schema 时应与现有表所在位置一致。不要为了消除重复建表而随意切换到新 schema。
+
+若生成结果包含已有表的 `CREATE TABLE`，先检查连接目标、schema 和构建产物；不要执行重复全量迁移或删除已执行的迁移记录。数据库与实体一致时，TypeORM 提示没有结构变化且不创建文件（普通 generate 返回退出码 1）。
 
 ## 初始化超级管理员
 

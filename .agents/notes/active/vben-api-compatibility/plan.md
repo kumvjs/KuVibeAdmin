@@ -117,6 +117,8 @@ Evidence: 40 Jest suites / 233 tests, 19 isolated PostgreSQL/Redis/Fastify integ
 
 ## M8 — Verification and release gates
 
+迁移工具补充（2026-09-16）：已修复空 `TYPEORM_SCHEMA` 导致重复生成全量表及 `sys_menu.meta` 默认值重复 ALTER。用户已执行基础表迁移；未执行的 `1789490156513-update-table.ts` 已修正为 4 张附件表的增量，部署方负责运行。本次仅进行了真实数据库只读差异验证，不代表 M8 的迁移执行/回滚验收完成。详见 [修复笔记](../../implemented/20260916-0041-fix-migration-schema.md)。
+
 - [ ] Add DTO-validation, service-unit, PostgreSQL integration, Redis invalidation, HTTP contract, and Vben e2e tests per domain.
 - [ ] Test unique/foreign-key constraints, cycle rejection, soft deletion, transaction rollback, concurrent state changes, and bigint string boundaries.
 - [ ] Test permissions before and after menu/role/user changes to prove cache invalidation.

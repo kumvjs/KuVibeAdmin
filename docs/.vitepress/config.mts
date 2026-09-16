@@ -47,6 +47,7 @@ export default defineConfig({
         items: [
           { text: 'Vben Admin 对接', link: '/frontend/vben' },
           { text: 'HTTP API', link: '/reference/api' },
+          { text: '内置公共能力', link: '/reference/common' },
         ],
       },
     ],

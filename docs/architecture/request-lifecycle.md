@@ -1,5 +1,7 @@
 # 请求处理链路
 
+装饰器、动态 Body 管道、DTO 与异常的使用示例见 [内置公共能力](/reference/common)。
+
 ## HTTP 链路
 
 ```text

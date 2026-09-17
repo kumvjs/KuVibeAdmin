@@ -1,7 +1,7 @@
 {
   "name": "@kumvjs/nest-ai-boot",
   "type": "module",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "",
   "author": "",
@@ -30,6 +30,7 @@
     "migration:create": "pnpm typeorm migration:create ./src/migrations/initData",
     "migration:generate": "pnpm build && pnpm typeorm -d ./dist/src/config/database.config.js migration:generate ./src/migrations/update-table",
     "migration:run": "pnpm build && pnpm typeorm -d ./dist/src/config/database.config.js migration:run",
+    "migration:check": "pnpm build && pnpm typeorm -d ./dist/src/config/database.config.js migration:check",
     "migration:show": "pnpm build && pnpm typeorm -d ./dist/src/config/database.config.js migration:show",
     "migration:revert": "pnpm build && pnpm typeorm -d ./dist/src/config/database.config.js migration:revert",
     "test:timezone": "cross-env TYPEORM_TYPE=postgres node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand src/utils/time.util.spec.ts src/modules/timezone",

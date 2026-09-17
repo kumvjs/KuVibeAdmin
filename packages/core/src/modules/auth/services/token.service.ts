@@ -3,19 +3,19 @@ import { Inject, Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
 
-import dayjs from 'dayjs'
-
 import { Repository } from 'typeorm'
+
 import { ERROR_CODES } from '#/common/constants/error-code.constant.js'
 import { BusinessException } from '#/common/exceptions/business.exception.js'
-
 import { securityConfig } from '#/config/index.js'
+
 import { UserStatus } from '#/modules/system/sys-user/sys-user.types.js'
 import { UserService } from '#/modules/user/user.service.js'
 import { CacheService } from '#/shared/cache/cache.service.js'
 import { authKeys } from '#/shared/cache/keys/index.js'
 import { onlineKeys } from '#/shared/cache/keys/online.keys.js'
 import { generateUUID } from '#/utils/index.js'
+import { dayjs } from '#/utils/time.util.js'
 import { RefreshTokenEntity } from '../entities/refresh-token.entity.js'
 import { JwtStrategy } from '../strategies/jwt.strategy.js'
 

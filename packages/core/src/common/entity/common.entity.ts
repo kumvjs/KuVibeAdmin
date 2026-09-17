@@ -10,7 +10,7 @@ export abstract class CommonEntity extends BaseEntity {
 
   @CreateDateColumn({
     name: 'created_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     update: false,
   })
   @ApiProperty({ description: '创建时间' })
@@ -18,14 +18,14 @@ export abstract class CommonEntity extends BaseEntity {
 
   @UpdateDateColumn({
     name: 'updated_at',
-    type: 'timestamp',
+    type: 'timestamptz',
   })
   @ApiProperty({ description: '更新时间' })
   updatedAt!: Date
 
   @DeleteDateColumn({
     name: 'deleted_at',
-    type: 'timestamp',
+    type: 'timestamptz',
     nullable: true,
   })
   @ApiProperty({ type: Date, description: '删除时间', required: false })

@@ -78,14 +78,18 @@ Acceptance: role CRUD and permission assignment are transactional, protected rol
 
 Acceptance: user CRUD preserves RBAC and session invariants, returns Vben-compatible fields, and cannot remove the system's final administrative access path.
 
-## M6 — Timezone preferences
+## M6 — 用户展示时区与统一时间工具（完成）
 
-- [ ] Choose a user column or separate preferences table for timezone and other per-user preferences.
-- [ ] Implement `GET /timezone/getTimezoneOptions`, `GET /timezone/getTimezone`, and `POST /timezone/setTimezone`.
-- [ ] Validate IANA zone IDs; do not persist fixed GMT offsets as timezone identity.
-- [ ] Decide whether the options endpoint remains public as in the mock or requires authentication; recommendation: options may be public, user value/update must be authenticated.
+- [x] 复用 sys_user.timezone：null 跟随设备，IANA 字符串固定展示偏好；不从服务器或浏览器自动设置业务默认值。
+- [x] 三个时区接口采用 Swagger/ResOp；选项公开，个人读写仅当前登录用户，支持 null 清空。
+- [x] 用户管理及个人偏好共用 IANA 校验；数据库持久化、部分字段更新及用户缓存失效。
+- [x] 提供纯 Day.js 工具：显式时区、严格日期/时间点、业务日和包含结束日期到半开时间点范围；23/25 小时日与异常零点有测试。
+- [x] 时间点列统一 timestamptz 默认精度，不设置 precision；PostgreSQL 会话统一 UTC。用户明确不要求历史迁移，本次未生成或执行迁移。
+- [x] 完成 HTTP/OpenAPI、工具、用户隔离、真实 PostgreSQL 持久化/微秒边界和跨进程 TZ 验证，更新接入文档。
 
-Acceptance: timezone is per-user and durable across processes/devices; invalid zones are rejected with the standard error contract.
+验收：43 个 Jest 套件 / 283 项测试、3 项时间集成检查（含独立 PostgreSQL）、2 项数据库配置检查、3 项契约工具测试、TS、Nest/文档构建、改动代码 ESLint 与锁定 Vben 契约通过。浏览器与完整 Passport 链仍在 M8；当前仓库不包含 Vben 前端，客户端需接入 null 与统一日期转换。
+
+版本：minor / bumped；根与 core 1.0.1 → 1.1.0，KuVibe schema/revision 不变。[完成记录](../../implemented/20260917-2013-feature-m6-timezone-tools.md)。
 
 ## M7 — Optional full-playground parity
 

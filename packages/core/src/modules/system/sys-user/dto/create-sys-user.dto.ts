@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
+import { IsIanaTimezone } from '#/common/decorators/class-validator/is-iana-timezone.decorator.js'
 import { UserStatus } from '../sys-user.types.js'
 
 export class CreateSysUserDto {
@@ -61,11 +62,10 @@ export class CreateSysUserDto {
   @IsIn([UserStatus.DISABLED, UserStatus.ENABLED])
   status: UserStatus
 
-  @ApiPropertyOptional({ description: 'IANA 时区；完整校验和偏好接口由 M6 提供', maxLength: 64 })
+  @ApiPropertyOptional({ type: String, nullable: true, description: '固定展示时区；null 表示跟随设备', maxLength: 64 })
   @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  timezone?: string
+  @IsIanaTimezone()
+  timezone?: string | null
 
   @ApiProperty({ description: '不可变登录账号', maxLength: 100, minLength: 4 })
   @IsString()

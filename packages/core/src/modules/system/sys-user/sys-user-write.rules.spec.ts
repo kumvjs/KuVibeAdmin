@@ -1,3 +1,4 @@
+import type { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import { UnprocessableEntityException } from '@nestjs/common'
 import { buildSysUserWriteState, normalizeRoleIds } from './sys-user-write.rules.js'
 import { UserStatus } from './sys-user.types.js'
@@ -43,5 +44,26 @@ describe('system-user write rules', () => {
     expect(() => buildSysUserWriteState({} as any)).toThrow(UnprocessableEntityException)
     expect(() => buildSysUserWriteState({ status: true } as any, current)).toThrow('status 必须是 0 或 1')
     expect(() => buildSysUserWriteState({ homePath: 'javascript:alert(1)' } as any, current)).toThrow('homePath')
+  })
+})
+
+describe('管理员用户写入的时区校验', () => {
+  const user = {
+    username: 'timezone_user',
+    name: '时区用户',
+    deptId: '1',
+    status: 1,
+    timezone: 'Asia/Tokyo',
+    homePath: null,
+    avatar: null,
+  } as SysUserEntity
+
+  it('省略保留偏好，null 恢复跟随设备', () => {
+    expect(buildSysUserWriteState({}, user).timezone).toBe('Asia/Tokyo')
+    expect(buildSysUserWriteState({ timezone: null }, user).timezone).toBeNull()
+  })
+
+  it.each(['GMT+8', '', 'Invalid/Zone'])('拒绝非法时区 %s', (timezone) => {
+    expect(() => buildSysUserWriteState({ timezone }, user)).toThrow()
   })
 })

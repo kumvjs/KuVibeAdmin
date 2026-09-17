@@ -16,7 +16,7 @@ export class RefreshTokenEntity extends CommonEntity {
   @Index('uq_user_refresh_token_value', { unique: true })
   value!: string
 
-  @Column({ comment: '令牌过期时间' })
+  @Column({ type: 'timestamptz', comment: '令牌过期时间' })
   expired_at!: Date
 
   @Column({ name: 'user_id', type: 'bigint' })

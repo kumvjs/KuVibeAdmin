@@ -1,6 +1,6 @@
 # Vben Admin 对接
 
-项目后端已覆盖 Vben 登录、动态菜单、系统管理和非生产 Playground 演示接口。前端仍需配置响应解包、Cookie、刷新逻辑和用户表单字段；M6 时区偏好尚未实现。
+项目后端已覆盖 Vben 登录、动态菜单、系统管理和非生产 Playground 演示接口。前端仍需配置响应解包、Cookie、刷新逻辑和用户表单字段；M6 已提供用户展示时区偏好，默认跟随设备；接入方式和日期范围工具见[时间与时区开发](../guide/timezone.md)。
 
 ## OpenAPI-TS 快速对接
 
@@ -255,6 +255,6 @@ Playground 保留 `/table/list`、`/demo/bigint` 和 `/status`，只在 local/de
 ### 尚缺适配
 
 - 用户表单的前端 `username/password/roleIds` 字段适配；
-- M6 用户时区偏好接口。
+- 前端时区选择增加“跟随设备”（null），使用本项目 Swagger 生成类型，并在公共日期筛选组件转换时间点边界。
 
 建议先固定 Vben 所用版本及其 mock API 契约，再以契约测试逐个补齐，避免仅凭路径名称适配。

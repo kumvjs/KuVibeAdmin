@@ -14,6 +14,8 @@ export const dataSourceOptions: DataSourceOptions = {
   // 空字符串会让 TypeORM 查询空 schema，无法识别已存在的表。
   schema: process.env.TYPEORM_SCHEMA?.trim() || undefined,
   synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true',
+  // PostgreSQL 每个池连接均使用 UTC；业务日历仍必须显式指定时区。
+  ...(process.env.TYPEORM_TYPE === 'postgres' ? { extra: { options: '-c timezone=UTC' } } : {}),
   entities: ['dist/**/*.entity{.js,.ts}'],
   migrations: ['dist/src/migrations/*{.js,.ts}'],
 }

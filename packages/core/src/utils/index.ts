@@ -1,5 +1,6 @@
 export * from './crypto.util.js'
 export * from './ip.util.js'
 export * from './request.util.js'
+export * from './time.util.js'
 export * from './timeout.util.js'
 export * from './tool.util.js'

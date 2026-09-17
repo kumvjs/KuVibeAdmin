@@ -28,7 +28,7 @@ Nest AI Boot 是一个以 NestJS 12 和 Fastify 为 HTTP 运行时的后端基�
     <tr><td>Redis 缓存</td><td>可用</td><td>统一序列化、空值缓存、TTL 抖动、分布式锁和前缀扫描删除。</td></tr>
     <tr><td>WebSocket</td><td>基础设施</td><td>基类、鉴权复用、会话与推送服务已存在，但没有具体 Gateway / 业务事件。</td></tr>
     <tr><td>AI Agents</td><td>规划中</td><td>没有对外 API、Agent 编排、工具系统、记忆或持久化实现。</td></tr>
-    <tr><td>Vben 适配</td><td>系统管理与 Playground 后端完成</td><td>登录、用户信息、权限码、动态菜单、系统管理及非生产演示接口已对齐；M6 时区仍待实现，用户表单需增加 username/password/roleIds。</td></tr>
+    <tr><td>Vben 适配</td><td>系统管理与 Playground 后端完成</td><td>登录、用户信息、权限码、动态菜单、系统管理及非生产演示接口已对齐；M6 用户展示偏好与统一时间工具已提供，前端需接入“跟随设备”；用户表单需增加 username/password/roleIds。</td></tr>
   </tbody>
 </table>
 

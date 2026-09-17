@@ -41,9 +41,9 @@ Paths omit this project's default `/api` global prefix.
 | GET | `/auth/codes` | button/action permission `string[]` | Implemented with effective menu/button codes |
 | GET | `/user/info` | `userId`, `username`, `realName`, `avatar`, `roles`, `homePath` and compatible profile fields | Implemented with a dedicated response DTO |
 | GET | `/menu/all` | authorized `RouteRecordStringComponent[]` tree | Implemented in M2.3 |
-| GET | `/timezone/getTimezoneOptions` | `Array<{ label, value }>` | Missing |
-| GET | `/timezone/getTimezone` | current user's IANA timezone or null | Missing |
-| POST | `/timezone/setTimezone` | `{ timezone }` | Missing |
+| GET | `/timezone/getTimezoneOptions` | `Array<{ label, value }>` | M6 已实现，公开 IANA 选项 |
+| GET | `/timezone/getTimezone` | current user's IANA timezone or null | M6 已实现，null 跟随设备 |
+| POST | `/timezone/setTimezone` | `{ timezone }` | M6 已实现，允许 null 清空，仅更新当前用户 |
 
 ### System management (18)
 
@@ -212,3 +212,7 @@ The user's deployment instruction supersedes the earlier mixed-hash migration pl
 User writes use serializable transactions. Create validates and locks one enabled department and every enabled role before saving the Argon2id hash and role mappings. Partial PUT preserves omitted roles and credentials; submitting `roleIds` hard-replaces mappings, while submitting `password` resets the hash and increments `session_version`. Disable, password reset, and delete remove persisted Refresh Tokens and invalidate token/session state after commit. Every update deletes the targeted user-info and permission caches.
 
 An enabled user who currently holds the enabled `super` role cannot be disabled, deleted, or have that role removed unless another enabled super user exists. The predicate is evaluated inside the serializable transaction with read locks so concurrent attempts cannot remove both administrative paths. Delete hard-removes user-role mappings and soft-deletes the user, allowing the active-only username index to support intentional reuse by a new identity.
+
+## M6 已确认决策
+
+用户展示偏好与业务日历规则分离。统一工具显式接收时区；不修改旧列表的包含 endTime 契约。timestamptz 使用数据库默认精度，Date 仍为毫秒；精确自然日范围使用排他终点。详情见完成记录和 docs/guide/timezone.md。

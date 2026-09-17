@@ -200,3 +200,15 @@ The temporary-upload checks below record the original implementation. They do no
 - [x] Real Redis tests prove cache hits avoid policy queries and stale concurrent refills are fenced. Unit tests cover Redis failure and bounded fallback/invalidation retries.
 - [x] Final verification: 40 Jest suites / 233 tests; 19 disposable PostgreSQL/Redis/Fastify checks under production environment; TypeScript, changed-code ESLint, Nest build, VitePress build, Vben lock/snapshot/fixtures and diff checks passed.
 - [x] No migration or business-database DDL was executed; test schemas/prefixes and temporary files are isolated. Antivirus remains an explicitly unscanned replaceable provider by default; full browser/login e2e is not claimed and remains M8.
+
+## 已完成 M6 — 用户时区与统一工具
+
+- [x] null 表示跟随设备；偏好只读写当前有效用户，重建数据库连接后仍可读取，其他用户不受影响。
+- [x] 公开选项保持 label/value；全量 IANA 区域不附固定 GMT 偏移，所有写入入口拒绝非法标识。
+- [x] Swagger 与真实 HTTP 的 nullable、必填字段、200/422、匿名拒绝及 ResOp 契约一致。
+- [x] 日期转换覆盖严格校验、跨年闰日、夏令时 23/25 小时、跳日和异常零点；UTC/上海/纽约进程结果相同。
+- [x] 实体默认精度与真实 PostgreSQL 微秒边界验证通过；不同会话时区读写同一时间点，偏好部分更新/软删除/禁用约束通过。
+- [x] 43 套件 / 283 测试、时间集成 3 项、数据库配置 2 项、契约工具 3 项及构建/静态检查通过；无业务库迁移或 setup 执行。
+- [x] minor / bumped，根目录及 core 1.0.1 → 1.1.0；完整前端/Passport e2e 仍属于 M8。
+
+详见[完成记录](../../implemented/20260917-2013-feature-m6-timezone-tools.md)。

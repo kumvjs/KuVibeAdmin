@@ -14,6 +14,7 @@ test('迁移配置正确处理默认与显式 schema', async () => {
         process.env.TYPEORM_SCHEMA = input
       const { default: source, dataSourceOptions } = await import(`../dist/src/config/database.config.js?schema=${encodeURIComponent(String(input))}`)
       assert.equal(dataSourceOptions.schema, expected)
+      assert.equal(dataSourceOptions.extra.options, '-c timezone=UTC')
       assert.equal(source.driver.parseTableName('sys_user').schema, expected)
       assert.equal(source.isInitialized, false)
     }

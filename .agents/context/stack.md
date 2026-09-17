@@ -52,3 +52,9 @@ order: number
 - Do not treat upstream mock data as a production domain model.
 - Do not add database tables for Vben demonstration-only status, bigint, or generic table fixtures.
 - Do not replace the established stack during ordinary Vben compatibility work.
+
+### 时间与展示偏好
+
+- CommonEntity 审计时间与令牌/附件过期时间使用显式 timestamptz 默认精度，不配置 precision；实体保持 Date。PostgreSQL 连接池通过 extra.options 统一 UTC。
+- sys_user.timezone 只表示展示偏好，null 跟随设备。TimezoneModule 已完成 M6，选项公开、个人偏好读写需登录。
+- 统一工具为 packages/core/src/utils/time.util.ts；业务日期运算必须传 IANA 时区，半开时间点边界用于 SQL 查询，不自动读取用户时区。权益/活动时区策略由业务定义。详见 docs/guide/timezone.md。

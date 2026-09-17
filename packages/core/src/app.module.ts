@@ -14,6 +14,7 @@ import { TrustedOriginGuard } from './modules/auth/guards/trusted-origin.guard.j
 import { isPlaygroundEnabled } from './modules/playground/playground.constants.js'
 import { PlaygroundModule } from './modules/playground/playground.module.js'
 import { SystemModule } from './modules/system/system.module.js'
+import { TimezoneModule } from './modules/timezone/timezone.module.js'
 import { UploadModule } from './modules/upload/upload.module.js'
 import { UserModule } from './modules/user/user.module.js'
 import { WebsocketModule } from './modules/websocket/websocket.module.js'
@@ -33,6 +34,7 @@ import { SharedModule } from './shared/shared.module.js'
     DatabaseModule,
     AuthModule,
     UserModule,
+    TimezoneModule,
     AiModule,
     SystemModule,
     UploadModule,

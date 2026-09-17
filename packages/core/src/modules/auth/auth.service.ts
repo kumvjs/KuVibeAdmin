@@ -1,6 +1,5 @@
 import type { AppConfig, SecurityConfig } from '#/config/index.js'
 import { Inject, Injectable } from '@nestjs/common'
-import dayjs from 'dayjs'
 import { ERROR_CODES } from '#/common/constants/error-code.constant.js'
 import { BusinessException } from '#/common/exceptions/business.exception.js'
 import { APP_CONFIG, securityConfig } from '#/config/index.js'
@@ -10,6 +9,7 @@ import {
   USER_PERMISSIONS_CACHE_SCHEMA_VERSION,
 } from '#/shared/cache/keys/auth.keys.js'
 import { generateUUID } from '#/utils/index.js'
+import { dayjs } from '#/utils/time.util.js'
 import { LoginLogService } from '../system/log/services/login-log.service.js'
 import { MenuService } from '../system/menu/menu.service.js'
 import { UserService } from '../user/user.service.js'

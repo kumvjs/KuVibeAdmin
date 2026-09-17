@@ -41,3 +41,7 @@ Establish the authoritative Vben API scope and implement the versioned backlog i
 - Support authenticated and object-authorized downloads. Approved security default: private files; explicitly approved business purposes may publish public images. Possession of an attachment ID is not download permission.
 - This is a new feature: the deployment owner creates its tables. Explicitly declare every entity column's database type. Do not generate migrations or delete/convert existing temporary files implicitly.
 - Approved defaults, security boundaries, cache consistency, and completed delivery are in [attachment-design.md](attachment-design.md). M7.1 includes production upload/download, attachment administration, persistent audit, trusted business binding, avatar integration, and reference-aware cleanup. Browser-driven Vben/complete login verification remains M8.
+
+## M6 完成范围
+
+展示偏好默认跟随设备；业务多时区和权益绑定由业务实现。后端提供可复用纯时间工具，不猜测默认业务时区。用户明确不要求开发阶段历史迁移，且 timestamptz 不设置 precision。当前范围不修改相邻 Vben 仓库或原列表查询语义。

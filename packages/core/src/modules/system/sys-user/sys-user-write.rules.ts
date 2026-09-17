@@ -2,6 +2,7 @@ import type { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import type { CreateSysUserDto } from './dto/create-sys-user.dto.js'
 import type { UpdateSysUserDto } from './dto/update-sys-user.dto.js'
 import { UnprocessableEntityException } from '@nestjs/common'
+import { isIanaTimezone } from '#/utils/time.util.js'
 import { UserStatus } from './sys-user.types.js'
 
 export interface SysUserWriteState {
@@ -103,6 +104,10 @@ export function buildSysUserWriteState(
   if (avatar !== current?.avatar && avatar && /\/attachments\/[1-9]\d*\/(?:public|content)(?:[?#]|$)/.test(avatar))
     invalid('系统附件头像必须通过头像绑定接口设置，不能直接写入下载 URL')
 
+  const timezone = dto.timezone === undefined ? current?.timezone ?? null : dto.timezone
+  if (timezone !== null && !isIanaTimezone(timezone))
+    invalid('timezone 必须是 IANA 时区或 null')
+
   return {
     avatar,
     deptId,
@@ -111,7 +116,7 @@ export function buildSysUserWriteState(
     name,
     remark: nullableString(dto.remark, 'remark', 255, current?.remark),
     status,
-    timezone: nullableString(dto.timezone, 'timezone', 64, current?.timezone),
+    timezone,
     username,
   }
 }

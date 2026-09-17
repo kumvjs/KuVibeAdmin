@@ -24,6 +24,7 @@ export default defineConfig({
           { text: '项目概览', link: '/guide/overview' },
           { text: '快速开始', link: '/guide/getting-started' },
           { text: '配置说明', link: '/guide/configuration' },
+          { text: '时间与时区', link: '/guide/timezone' },
         ],
       },
       {

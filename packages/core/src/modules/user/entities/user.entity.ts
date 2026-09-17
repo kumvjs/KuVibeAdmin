@@ -63,6 +63,7 @@ export class SysUserEntity extends CommonEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   remark: string | null
 
+  /** 展示偏好；null 表示跟随设备，不作为业务权益时区。 */
   @Column({ type: 'varchar', length: 64, nullable: true })
   timezone: string | null
 

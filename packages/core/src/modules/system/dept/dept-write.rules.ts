@@ -2,6 +2,7 @@ import type { CreateDeptDto } from './dto/create-dept.dto.js'
 import type { UpdateDeptDto } from './dto/update-dept.dto.js'
 import type { SysDeptEntity } from './entities/dept.entity.js'
 import { UnprocessableEntityException } from '@nestjs/common'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import { DeptStatus } from './dept.types.js'
 
 export interface DeptWriteState {
@@ -16,7 +17,7 @@ const POSTGRES_BIGINT_MAX = BigInt('9223372036854775807')
 const MAX_ORDER = 2_147_483_647
 
 function hasOwn(value: object, key: PropertyKey): boolean {
-  return Object.hasOwn(value, key)
+  return hasSubmittedField(value, key)
 }
 
 function invalid(message: string): never {

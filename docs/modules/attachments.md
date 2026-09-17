@@ -4,7 +4,7 @@
 
 ## 初始化与部署
 
-由部署方按实体创建 `sys_upload_policy`、`sys_attachment`、`sys_attachment_reference`、`sys_attachment_audit` 四张新表。本功能不提供迁移，不自动建业务表，也不转换或删除旧 `public/uploads` 文件。旧临时上传路由和清理器已移除，旧上传静态目录不再开放。
+正式版附件迁移创建 `sys_upload_policy`、`sys_attachment`、`sys_attachment_reference`、`sys_attachment_audit` 四张表，由部署方审查后执行。应用启动不自动建业务表，也不转换或删除旧 `public/uploads` 文件。旧临时上传路由和清理器已移除，旧上传静态目录不再开放。
 
 本地文件落在应用工作目录的 `var/attachments`，应挂载持久卷并限制为应用账号访问，不能挂到 Web 服务器公开目录，也不能通过符号链接指向其他位置。数据库保存随机对象 key，原始名称只作为展示/下载名称。多实例必须共享该持久卷；对象存储、分片续传和文档预览不属于本期实现。
 
@@ -64,4 +64,4 @@
 
 ## 验证
 
-运行单元测试后，可对独立的本机 PostgreSQL/Redis 执行 `pnpm test:upload:integration`，需提供 `UPLOAD_TEST_DATABASE_URL`（数据库名限定为 `m71_test`）和 `UPLOAD_TEST_REDIS_URL`。测试创建并清理自己的随机 schema/Redis 前缀及临时文件，不使用现有业务库。集成测试使用真实 PostgreSQL、Redis、Fastify、JWT 签名验证和 RBAC；完整登录/Passport 会话及浏览器 Vben 联调仍属于跨模块 M8 验证。
+运行单元测试后，可对独立的本机 PostgreSQL/Redis 执行 `pnpm test:upload:integration`，需提供 `UPLOAD_TEST_DATABASE_URL`（数据库名限定为 `m71_test`）和 `UPLOAD_TEST_REDIS_URL`。测试创建并清理自己的随机 schema/Redis 前缀及临时文件，不使用现有业务库。集成测试使用真实 PostgreSQL、Redis、Fastify、JWT 签名验证和 RBAC；完整登录/Passport 会话及浏览器 Vben 联调见[发布验收](../guide/release-verification.md)。

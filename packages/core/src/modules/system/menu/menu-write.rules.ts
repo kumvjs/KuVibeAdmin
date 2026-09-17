@@ -3,6 +3,7 @@ import type { UpdateMenuDto } from './dto/update-menu.dto.js'
 import type { SysMenuEntity } from './entities/menu.entity.js'
 import type { MenuMeta } from './menu.types.js'
 import { UnprocessableEntityException } from '@nestjs/common'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import { isVbenMenuMeta } from './dto/is-vben-menu-meta.decorator.js'
 import { MenuStatus, MenuType } from './menu.types.js'
 
@@ -24,7 +25,7 @@ const AUTH_CODE_PATTERN = /^[a-z][\w-]*(?::[a-z][\w-]*)+$/i
 const COMPONENT_PATTERN = /^(?!\/\/)[\w@./-]+$/
 
 function hasOwn(value: object, key: PropertyKey): boolean {
-  return Object.hasOwn(value, key)
+  return hasSubmittedField(value, key)
 }
 
 function invalid(message: string): never {

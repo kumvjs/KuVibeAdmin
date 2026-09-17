@@ -3,6 +3,7 @@ import type { UpdateRoleDto } from './dto/update-role.dto.js'
 import type { SysRoleEntity } from './entities/role.entity.js'
 import { UnprocessableEntityException } from '@nestjs/common'
 import { Roles } from '#/modules/auth/auth.constant.js'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import { RoleStatus } from './role.types.js'
 
 export interface RoleWriteState {
@@ -17,7 +18,7 @@ const CODE_PATTERN = /^[a-z][a-z0-9:_-]*$/
 const RESERVED_CODES = new Set<string>(Object.values(Roles))
 
 function hasOwn(value: object, key: PropertyKey): boolean {
-  return Object.hasOwn(value, key)
+  return hasSubmittedField(value, key)
 }
 
 function invalid(message: string): never {

@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: Nest AI Boot
-  text: 面向多 Agent 应用的后端底座
-  tagline: NestJS 12 + Fastify + PostgreSQL + TypeORM + Redis + Socket.IO + RBAC；AI Agents 能力正在规划开发中。
+  name: KuVibeAdmin
+  text: 面向 AI 辅助开发的管理系统后端
+  tagline: 基于 KuVibe 工程协议，使用 NestJS + PostgreSQL + Redis，为 Vben Admin 提供真实的认证、权限与系统管理能力。当前版本交付后端。
   image:
     src: /logo.svg
-    alt: Nest AI Boot
+    alt: KuVibeAdmin
   actions:
     - theme: brand
       text: 开始使用

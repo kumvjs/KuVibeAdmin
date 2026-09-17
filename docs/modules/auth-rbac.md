@@ -28,7 +28,7 @@ JWT 校验还会检查：
 
 ## 密码哈希模型
 
-M5 按部署方“直接新建表”的要求采用 Argon2id-only 模型，不生成迁移、不加载旧 MD5，也不保留 `psalt`。`password_algorithm` 必须为 `argon2id`，`password_hash` 必须为 PHC 字符串；新建、初始化和管理端重置都走相同哈希入口。
+用户模型采用 Argon2id-only，正式版提供新安装基础迁移，不加载旧 MD5，也不保留 `psalt`。`password_algorithm` 必须为 `argon2id`，`password_hash` 必须为 PHC 字符串；新建、初始化和管理端重置都走相同哈希入口。
 
 默认参数为 `m=19456 KiB,t=2,p=1,hashLength=32`，达到当前 [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) 的最低建议。`PASSWORD_ARGON2_MEMORY_COST/TIME_COST/PARALLELISM/HASH_LENGTH` 只能设置为不低于该下限的整数；PHC 参数变化可通过 `needsRehash` 识别。开发机 smoke benchmark 不能代替生产硬件容量和延迟测试。
 
@@ -62,7 +62,7 @@ sys_user ───────> sys_dept（nullable，删除 RESTRICT）
 
 `sys_dept` 使用 bigint `pid` 自关联，持久化 `name`、numeric `status`、`remark` 与整数 `order_no`，并继承审计和软删除字段。根部门名称、同一父级下的部门名称分别由仅覆盖未软删除记录的部分唯一索引保护；父部门与 `sys_user.dept_id` 的外键删除策略均为 `RESTRICT`。
 
-部门写服务通过可串行化事务、父链锁和数据库约束共同保护树结构及并发唯一性。删除前检查活动子部门和全部用户引用；修改 `status` 不操作子部门、用户、角色或权限缓存。与菜单重建一样，本批次不生成迁移或执行 DDL，实际新表与用户字段由部署方创建。
+部门写服务通过可串行化事务、父链锁和数据库约束共同保护树结构及并发唯一性。删除前检查活动子部门和全部用户引用；修改 `status` 不操作子部门、用户、角色或权限缓存。部门表与用户归属字段包含在正式版基础迁移中，由部署方审查后执行。
 
 ## 角色持久化与授权
 
@@ -70,7 +70,7 @@ sys_user ───────> sys_dept（nullable，删除 RESTRICT）
 
 角色权限表单中的 `permissions` 是 `sys_menu` ID，不是 `auth_code` 字符串。更新先锁定并确认所有菜单仍存在，再 hard-delete 旧 `sys_role_menu` 并插入新集合；整个替换与角色更新处于同一个可串行化事务。未提交 permissions 的局部更新保留原映射。
 
-`super` 和 `is_default=true` 角色不能停用或删除，普通角色存在任何用户关系时也不能删除。`sys_user_role` 使用命名的用户/角色索引、唯一用户角色对以及 `role_id ON DELETE RESTRICT`。角色更新提交后，只失效当前分配该角色用户的 `auth:user:permissions:*` 缓存。角色停用不改写用户账号或 `sys_user_role`；权限变化由下一次缓存回源立即反映。本批不生成数据库迁移，部署方负责按新映射创建角色相关表和外键。
+`super` 和 `is_default=true` 角色不能停用或删除，普通角色存在任何用户关系时也不能删除。`sys_user_role` 使用命名的用户/角色索引、唯一用户角色对以及 `role_id ON DELETE RESTRICT`。角色更新提交后，只失效当前分配该角色用户的 `auth:user:permissions:*` 缓存。角色停用不改写用户账号或 `sys_user_role`；权限变化由下一次缓存回源立即反映。角色相关表和外键包含在正式版基础迁移中，由部署方审查后执行。
 
 ## 用户管理与角色分配
 

@@ -27,7 +27,7 @@ export class SysUserController {
   @Post()
   @RequirePermissions(SYS_USER_PERMISSIONS.CREATE)
   @ApiOperation({ summary: '新增系统用户并分配角色' })
-  @ApiResult({ type: Boolean })
+  @ApiResult({ status: 201, type: Boolean })
   async create(@Body() dto: CreateSysUserDto): Promise<boolean> {
     return this.sysUserService.create(dto)
   }

@@ -1,5 +1,15 @@
 # 变更记录
 
+## 1.2.0 — 2026-09-18
+
+- 正式更名为 KuVibeAdmin，仓库地址调整为 `kumvjs/KuVibeAdmin`，新增根 README，明确基于 KuVibe 工程协议及当前仅交付 NestJS 后端的范围。
+- 新增根目录启动、构建、初始化、类型检查、测试、迁移及文档命令；修正 production 构建入口和 ESM 测试调用。
+- 完成 M8 发布验收：真实应用/Passport、PostgreSQL/Redis、全部迁移往返、权限缓存失效、并发刷新及固定 Vben v5.7.0 浏览器联调；保留可重复测试脚本。
+- 修复 DTO 类未提交的 undefined 字段被当作显式写入的问题，保留局部更新与 null 清空语义。
+- 修正 POST 成功响应的 OpenAPI 状态码和退出响应，保持实际 HTTP 行为及 ResOp 契约不变；更新迁移与接入文档。
+- 统一版本 minor：根目录与 core 从 1.1.1 升至 1.2.0。数据库/schema/Redis 键/API 前缀不随品牌改变，保留已应用时间戳迁移。
+- 验证边界：全量 ESLint 有既存问题，本次改动文件通过；Atlas Pro lint、生产规模及零停机演练未执行。Vben 前端不随本版本发布，其用户表单仍需接入方适配。
+
 ## 1.1.1 — 2026-09-17
 
 - 接入 Atlas 项目 Skill 与 Agent 迁移路由，明确生成后的数据保留修正、隔离数据库验证、锁与发布兼容性检查；普通终端 pnpm 不自动运行 Skill。

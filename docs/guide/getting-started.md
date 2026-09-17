@@ -2,7 +2,7 @@
 
 ## 环境要求
 
-- Node.js 20 或更高版本（建议使用当前 LTS）
+- Node.js 24（本次验收使用 24.15.0）
 - pnpm
 - PostgreSQL
 - Redis
@@ -13,7 +13,7 @@
 pnpm install
 ```
 
-复制 `.env.example` 为 `.env.local`，至少填写 PostgreSQL、Redis、`JWT_SECRET` 和 `REFRESH_TOKEN_SECRET`。本地启动脚本会设置 `NODE_ENV=local`，因此优先读取 `.env.local`。
+复制 `packages/core/.env.example` 为 `packages/core/.env.local`，至少填写 PostgreSQL、Redis、`JWT_SECRET` 和 `REFRESH_TOKEN_SECRET`。本地启动脚本会设置 `NODE_ENV=local`，因此优先读取 `.env.local`。
 
 ::: warning 不要提交密钥
 `.env.local` 已被 Git 忽略。生产环境应由密钥管理系统注入配置，不要沿用示例值。
@@ -21,10 +21,9 @@ pnpm install
 
 ## 准备数据库
 
-在 `packages/core` 目录执行迁移命令；`generate`、`run`、`show`、`revert` 会先构建代码，保证 CLI 读取最新实体和迁移文件：
+在仓库根目录执行迁移命令；`generate`、`run`、`show`、`revert` 会先构建代码，保证 CLI 读取最新实体和迁移文件：
 
 ```bash
-cd packages/core
 pnpm migration:show
 pnpm migration:run
 ```
@@ -136,3 +135,20 @@ pnpm docs:dev
 pnpm docs:build
 pnpm docs:preview
 ```
+
+## 根目录常用命令
+
+全部后端命令自动在 `packages/core` 执行；环境文件仍放在该目录。
+
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm start:local` | 本地监听，读取 `.env.local` |
+| `pnpm start:dev` | 开发监听，读取 `.env.development` |
+| `pnpm build` | 构建后端 |
+| `pnpm start:prod` | production 模式运行 `dist/src/main.js` |
+| `pnpm setup` | 交互初始化管理员 |
+| `pnpm test` / `pnpm typecheck` | 单元测试 / 类型检查 |
+| `pnpm lint:check` / `pnpm lint` | 只读 ESLint 检查 / 自动修复 |
+| `pnpm docs:dev` / `pnpm docs:build` / `pnpm docs:preview` | 文档开发 / 构建 / 预览 |
+
+完整命令和用途见[项目 README](https://github.com/kumvjs/KuVibeAdmin#根目录常用命令)，独立数据库测试见[发布验收](release-verification.md)。生产启动要求 HTTPS 公开地址、精确 Origin 白名单和安全 Cookie；迁移脚本仍固定使用 local 配置，上线执行方式必须经部署审查。

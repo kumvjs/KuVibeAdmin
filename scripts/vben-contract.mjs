@@ -102,7 +102,7 @@ function sparseCheckoutPaths(lock) {
 }
 
 function createSparseClone(lock, ref = lock.tag) {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'nest-ai-boot-vben-'))
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'kuvibeadmin-vben-'))
   const sourceRoot = join(temporaryRoot, 'vue-vben-admin')
 
   try {

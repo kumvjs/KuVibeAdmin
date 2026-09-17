@@ -111,28 +111,28 @@ export async function apiRequest<F extends (...args: any[]) => Promise<any>>(
 
 ```ts
 import {
-  authControllerCodes,
-  authControllerLogin,
-  authControllerRefresh,
-  userControllerInfo,
+  authCodes,
+  authLogin,
+  authRefresh,
+  userInfo,
 } from '#/client'
 import { apiRequest } from '#/api/api-client'
 
-const loginResult = await apiRequest(authControllerLogin, {
+const loginResult = await apiRequest(authLogin, {
   body: { username: 'admin', password: 'your-password' },
   withCredentials: true,
 })
 accessStore.setAccessToken(loginResult.accessToken)
 
-const userInfo = await apiRequest(userControllerInfo)
-const accessCodes = await apiRequest(authControllerCodes)
+const currentUser = await apiRequest(userInfo)
+const accessCodes = await apiRequest(authCodes)
 console.log(userInfo.userId, userInfo.roles, accessCodes)
 ```
 
 刷新接口同样返回 `ResOp<{ accessToken }>`，不要为它创建“裸字符串”特例：
 
 ```ts
-const result = await apiRequest(authControllerRefresh, {
+const result = await apiRequest(authRefresh, {
   withCredentials: true,
 })
 accessStore.setAccessToken(result.accessToken)
@@ -188,7 +188,7 @@ Vben 请求客户端应以 `code === 0` 或 `success === true` 判断成功，�
 登录请求示例：
 
 ```ts
-const result = await apiRequest(authControllerLogin, {
+const result = await apiRequest(authLogin, {
   body: { username, password },
   withCredentials: true,
 })
@@ -226,7 +226,7 @@ Vben v5.7.0 的部门页可使用 `GET /system/dept/list`、`POST /system/dept`�
 
 后端额外支持表单可选字段 `order`，默认值为 `0`，同级部门按 `order/name/id` 稳定排序。父级必须存在，不能选择自身或后代；同一父级下活动部门名称不能重复。删除仍有关联子部门或用户的部门会收到 HTTP 409。停用部门不会自动停用其子部门或用户，前端不应推断这种级联语义。
 
-部门及用户归属字段由部署方依据实体映射新建，本代码不执行数据库迁移；上线接口前必须先创建 `sys_dept` 和 `sys_user.dept_id`。
+正式版提供 TypeORM 迁移；新安装按快速开始执行迁移，已有环境先检查迁移历史，禁止重复创建 `sys_dept` 或 `sys_user.dept_id`。
 
 ### 角色管理
 
@@ -234,7 +234,7 @@ Vben v5.7.0 角色页可使用 `GET /system/role/list` 及角色 POST、PUT、DE
 
 创建角色可额外提交不可变 `code`，省略时后端生成 `role:<uuid>`；编辑接口不会接受 code。权限树值会在事务中整体替换，任何不存在或已软删除的菜单 ID 都会使整次修改失败。只切换状态时前端可继续提交 `{ status }`，不会清空权限。
 
-`super` 和部署方标记的默认角色不能停用或删除；存在用户引用的普通角色也不能删除。角色授权或状态提交成功后，后端会定向清除所有受影响用户的权限缓存。角色表和关联表仍由部署方依据实体创建，本代码不执行迁移。
+`super` 和部署方标记的默认角色不能停用或删除；存在用户引用的普通角色也不能删除。角色授权或状态提交成功后，后端会定向清除所有受影响用户的权限缓存。角色表和关联表包含在正式版基础迁移中；已有环境先核对迁移历史。
 
 ### 用户管理
 
@@ -244,7 +244,7 @@ Vben v5.7.0 用户页可使用 `GET /system/user/list` 及用户 POST、PUT、DE
 
 编辑时省略 roleIds 会保留现有角色，状态开关仍可只发送 `{ status }`。角色修改后权限缓存立即失效；停用、删除或密码重置会强制该用户已有会话失效。最后一个启用 super 管理员不能被停用、删除或移除 super 角色，前端应展示后端 HTTP 409 消息。
 
-用户表由部署方依据实体直接新建，不执行迁移，也不保留 MD5/`psalt` 数据。若已有旧环境需要保留用户，必须单独设计经审核的数据迁移和强制重置流程，不能把旧哈希直接复制到新表。
+正式版基础迁移创建 Argon2id 用户表，不提供 MD5/`psalt` 旧数据转换。若已有旧环境需要保留用户，必须单独设计经审核的数据迁移和强制重置流程，不能把旧哈希直接复制到新表。
 
 ### Playground 演示接口
 
@@ -258,3 +258,7 @@ Playground 保留 `/table/list`、`/demo/bigint` 和 `/status`，只在 local/de
 - 前端时区选择增加“跟随设备”（null），使用本项目 Swagger 生成类型，并在公共日期筛选组件转换时间点边界。
 
 建议先固定 Vben 所用版本及其 mock API 契约，再以契约测试逐个补齐，避免仅凭路径名称适配。
+
+## 已验证的联调范围
+
+固定 v5.7.0 的浏览器验收、请求适配和可重复命令见[发布验收](../guide/release-verification.md)。本仓库只交付后端；用户表单与日期筛选的前端适配仍由接入方完成。系统管理的 POST 创建接口和认证 POST 默认返回 HTTP 201，上传及时区保存显式返回 200；均遵循 ResOp，Swagger 与实际状态同步。

@@ -27,7 +27,7 @@ export class AuthController {
   @Post('login')
   @Public()
   @ApiOperation({ summary: '登录' })
-  @ApiResult({ type: LoginTokenResponseDto })
+  @ApiResult({ status: 201, type: LoginTokenResponseDto })
   async login(@Body() dto: LoginDto, @GetIp() ip: string, @Headers('user-agent') ua: string, @Res({ passthrough: true }) res: FastifyReply): Promise<LoginTokenResponseDto> {
     // await this.captchaService.checkImgCaptcha(dto.captchaId, dto.verifyCode)
     const { accessToken, refreshToken } = await this.authService.login(
@@ -42,6 +42,7 @@ export class AuthController {
 
   @Post('logout')
   @ApiOperation({ summary: '账户登出' })
+  @ApiResult({ status: 201, nullable: true })
   async logout(
     @CurrentUser() user: LoginUserContext,
     @Req() req: FastifyRequest,
@@ -60,7 +61,7 @@ export class AuthController {
 
   @Post('refresh')
   @Public()
-  @ApiResult({ type: LoginTokenResponseDto })
+  @ApiResult({ status: 201, type: LoginTokenResponseDto })
   @ApiOperation({ summary: '根据refreshToken刷新accessToken' })
   async refresh(@Req() req: FastifyRequest, @Res({ passthrough: true }) res: FastifyReply) {
     const oldRefreshToken = req.cookies?.refresh_token

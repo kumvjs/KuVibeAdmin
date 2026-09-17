@@ -43,7 +43,7 @@ export class SystemMenuController {
   @Post()
   @RequirePermissions(MENU_PERMISSIONS.CREATE)
   @ApiOperation({ summary: '新增菜单' })
-  @ApiResult({ type: Boolean })
+  @ApiResult({ status: 201, type: Boolean })
   async create(@Body() dto: CreateMenuDto): Promise<boolean> {
     return this.menuService.createMenu(dto)
   }

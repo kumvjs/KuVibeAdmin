@@ -9,7 +9,7 @@
 4. 对于有进行中范围的任务，阅读 `.agents/notes/active/` 下对应目录并维护其产物。
 5. 保留项目文档和用户现有改动；使用 Git 历史恢复，刷新或迁移不得重新生成项目知识。
 
-当前进行中的业务工作：`.agents/notes/active/vben-api-compatibility/`。
+Vben 兼容 M0–M8 已完成，验收记录：`.agents/notes/implemented/20260918-0619-release-kuvibeadmin-1-2-0.md`。
 <!-- kuvibe:managed:end -->
 
 ## 数据库迁移

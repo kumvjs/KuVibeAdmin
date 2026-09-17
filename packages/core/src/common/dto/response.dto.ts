@@ -72,6 +72,10 @@ export class ResultDataAndTotalDto<T> extends Pagination {
 
 // 3. 装饰器参数接口定义
 export interface ApiResultOptions<TModel extends Type<any>> {
+  /** 实际 HTTP 成功状态；Nest POST 默认 201，显式 HttpCode 除外。 */
+  status?: number
+  /** 无返回值接口使用 null。 */
+  nullable?: boolean
   /** 具体的 DTO / Entity 实体，或者是基础类型构造函数 (String, Number, Boolean) */
   type?: TModel | [TModel]
   /** 是否为分页列表，默认为 false */

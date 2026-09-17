@@ -2,6 +2,7 @@ import type { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import type { CreateSysUserDto } from './dto/create-sys-user.dto.js'
 import type { UpdateSysUserDto } from './dto/update-sys-user.dto.js'
 import { UnprocessableEntityException } from '@nestjs/common'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import { isIanaTimezone } from '#/utils/time.util.js'
 import { UserStatus } from './sys-user.types.js'
 
@@ -21,7 +22,7 @@ const POSTGRES_BIGINT_MAX = BigInt('9223372036854775807')
 const USERNAME_PATTERN = /^[a-z\d][\w.-]*$/i
 
 function hasOwn(value: object, key: PropertyKey): boolean {
-  return Object.hasOwn(value, key)
+  return hasSubmittedField(value, key)
 }
 
 function invalid(message: string): never {

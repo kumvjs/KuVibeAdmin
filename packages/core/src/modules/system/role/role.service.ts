@@ -12,6 +12,7 @@ import { SysMenuEntity } from '#/modules/system/menu/entities/menu.entity.js'
 import SysUserRoleEntity from '#/modules/user/entities/user-role.entity.js'
 import { CacheService } from '#/shared/cache/cache.service.js'
 import { authKeys } from '#/shared/cache/keys/auth.keys.js'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import SysRoleMenuEntity from './entities/role-menu.entity.js'
 import { SysRoleEntity } from './entities/role.entity.js'
 import { assertPublicRoleCode, assertRoleId, buildRoleWriteState, normalizePermissionIds } from './role-write.rules.js'
@@ -112,7 +113,7 @@ export class RoleService {
         throw new ConflictException('系统超级角色或默认角色不能停用')
 
       await this.assertUniqueRole(repository, state.name, undefined, id)
-      if (Object.hasOwn(dto, 'permissions')) {
+      if (hasSubmittedField(dto, 'permissions')) {
         const permissionIds = normalizePermissionIds(dto.permissions)
         await this.validateMenuIds(manager, permissionIds)
         await this.replacePermissions(manager, id, permissionIds)

@@ -20,6 +20,7 @@ import { CacheService } from '#/shared/cache/cache.service.js'
 import { authKeys } from '#/shared/cache/keys/auth.keys.js'
 import { onlineKeys } from '#/shared/cache/keys/online.keys.js'
 import { userKeys } from '#/shared/cache/keys/user.keys.js'
+import { hasSubmittedField } from '#/utils/submitted-field.util.js'
 import { assertPassword, assertSysUserId, buildSysUserWriteState, normalizeRoleIds } from './sys-user-write.rules.js'
 import { PasswordAlgorithm, UserStatus } from './sys-user.types.js'
 
@@ -108,7 +109,7 @@ export class SysUserService {
 
   async update(id: string, dto: UpdateSysUserDto): Promise<boolean> {
     assertSysUserId(id)
-    const passwordHash = Object.hasOwn(dto, 'password')
+    const passwordHash = hasSubmittedField(dto, 'password')
       ? await this.preparePassword(dto.password)
       : undefined
 
@@ -122,7 +123,7 @@ export class SysUserService {
         throw new NotFoundException('用户不存在')
 
       const state = buildSysUserWriteState(dto, current)
-      const submittedRoleIds = Object.hasOwn(dto, 'roleIds')
+      const submittedRoleIds = hasSubmittedField(dto, 'roleIds')
         ? normalizeRoleIds(dto.roleIds)
         : undefined
 

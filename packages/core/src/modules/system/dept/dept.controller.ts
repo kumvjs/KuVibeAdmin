@@ -26,7 +26,7 @@ export class DeptController {
   @Post()
   @RequirePermissions(DEPT_PERMISSIONS.CREATE)
   @ApiOperation({ summary: '新增部门' })
-  @ApiResult({ type: Boolean })
+  @ApiResult({ status: 201, type: Boolean })
   async create(@Body() dto: CreateDeptDto): Promise<boolean> {
     return this.deptService.create(dto)
   }

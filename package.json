@@ -1,10 +1,34 @@
 {
-  "name": "nest-ai-boot",
-  "version": "1.1.1",
-  "description": "",
-  "main": "index.js",
+  "name": "kuvibe-admin",
+  "version": "1.2.0",
+  "description": "基于 KuVibe 的 AI 友好 NestJS 后端底座，面向 Vben Admin 管理系统",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "pnpm --dir packages/core start",
+    "start:local": "pnpm --dir packages/core start:local",
+    "start:dev": "pnpm --dir packages/core start:dev",
+    "start:debug": "pnpm --dir packages/core start:debug",
+    "start:prod": "pnpm --dir packages/core start:prod",
+    "build": "pnpm --dir packages/core build",
+    "setup": "pnpm --dir packages/core setup",
+    "lint": "pnpm --dir packages/core lint",
+    "lint:check": "pnpm --dir packages/core lint:check",
+    "typecheck": "pnpm --dir packages/core typecheck",
+    "test": "pnpm --dir packages/core test",
+    "test:watch": "pnpm --dir packages/core test:watch",
+    "test:cov": "pnpm --dir packages/core test:cov",
+    "test:e2e": "pnpm --dir packages/core test:e2e",
+    "test:release": "pnpm --dir packages/core test:release",
+    "test:upload:integration": "pnpm --dir packages/core test:upload:integration",
+    "test:timezone:integration": "pnpm --dir packages/core test:timezone:integration",
+    "test:migration:integration": "pnpm --dir packages/core test:migration:integration",
+    "migration:create": "pnpm --dir packages/core migration:create",
+    "migration:generate": "pnpm --dir packages/core migration:generate",
+    "migration:run": "pnpm --dir packages/core migration:run",
+    "migration:show": "pnpm --dir packages/core migration:show",
+    "migration:revert": "pnpm --dir packages/core migration:revert",
+    "docs:dev": "pnpm --dir docs dev",
+    "docs:build": "pnpm --dir docs build",
+    "docs:preview": "pnpm --dir docs preview",
     "vben:contract:collect": "node ./scripts/vben-contract.mjs generate --write",
     "vben:contract:check": "node ./scripts/vben-contract.mjs check",
     "vben:contract:diff": "node ./scripts/vben-contract.mjs diff",
@@ -22,5 +46,14 @@
     }
   },
   "packageManager": "pnpm@11.25.0",
-  "type": "module"
+  "type": "module",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kumvjs/KuVibeAdmin.git"
+  },
+  "homepage": "https://github.com/kumvjs/KuVibeAdmin",
+  "bugs": {
+    "url": "https://github.com/kumvjs/KuVibeAdmin/issues"
+  }
 }

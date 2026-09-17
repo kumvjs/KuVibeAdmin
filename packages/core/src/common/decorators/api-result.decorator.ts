@@ -1,5 +1,5 @@
 import { applyDecorators, Type } from '@nestjs/common'
-import { ApiExtraModels, ApiOkResponse, getSchemaPath } from '@nestjs/swagger'
+import { ApiExtraModels, ApiResponse, getSchemaPath } from '@nestjs/swagger'
 import { ApiResultOptions, ResOp, ResultDataAndTotalDto } from '../dto/response.dto.js'
 
 const baseTypeNames = ['String', 'Number', 'Boolean']
@@ -7,7 +7,7 @@ const baseTypeNames = ['String', 'Number', 'Boolean']
  * @description: 生成统一返回结果的 Swagger 装饰器
  */
 export function ApiResult<TModel extends Type<any>>(options: ApiResultOptions<TModel> = {}) {
-  const { type, isPage = false, description } = options
+  const { type, isPage = false, description, status = 200, nullable = false } = options
 
   const extraModels: Type<any>[] = [ResOp]
   let dataSchema: any = {}
@@ -52,14 +52,15 @@ export function ApiResult<TModel extends Type<any>>(options: ApiResultOptions<TM
   // 4. 返回组合后的 Swagger 装饰器
   return applyDecorators(
     ApiExtraModels(...extraModels),
-    ApiOkResponse({
+    ApiResponse({
+      status,
       description,
       schema: {
         allOf: [
           { $ref: getSchemaPath(ResOp) }, // 继承基础结构 code, message, success
           {
             properties: {
-              data: dataSchema, // 动态覆盖 data 字段的类型
+              data: nullable ? { ...dataSchema, nullable: true } : dataSchema, // 动态覆盖 data 字段的类型
             },
           },
         ],

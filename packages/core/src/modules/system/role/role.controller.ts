@@ -27,7 +27,7 @@ export class RoleController {
   @Post()
   @RequirePermissions(ROLE_PERMISSIONS.CREATE)
   @ApiOperation({ summary: '新增角色' })
-  @ApiResult({ type: Boolean })
+  @ApiResult({ status: 201, type: Boolean })
   async create(@Body() dto: CreateRoleDto): Promise<boolean> {
     return this.roleService.create(dto)
   }

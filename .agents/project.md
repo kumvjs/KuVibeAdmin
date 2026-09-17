@@ -4,13 +4,13 @@
 
 ## Product
 
-Nest AI Boot is a NestJS backend foundation for administrative applications, Vben Admin integration, RBAC, PostgreSQL/Redis-backed authentication, WebSocket features, and AI capabilities.
+KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。当前仅交付后端，Vben 前端独立接入；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
 
 ## Users and domain
 
 - Administrative web clients, with Vben Admin as the currently documented frontend target.
 - Authenticated users, roles, menus/button permissions, refresh-token sessions, and system administrators.
-- Planned Vben system-management domains include departments and complete user/role/menu management.
+- Vben v5.7.0 的部门、用户、角色、菜单、时区和附件后端已完成并通过 M8 集成/浏览器验收。
 
 ## Repository shape
 
@@ -39,8 +39,12 @@ Nest AI Boot is a NestJS backend foundation for administrative applications, Vbe
 
 ## 产品版本约定
 
-- 版本来源为根 `package.json` 和私有应用 `packages/core/package.json`；2026-09-17 核查时两者均为 `1.0.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
+- 版本来源为根 `package.json` 和私有应用 `packages/core/package.json`；本次正式版两者均为 `1.2.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
 - 撤销此前“开发期默认延后递增”的 Agent 推断：缺少发布脚本、CHANGELOG 及历史递增记录不能证明存在延后政策。仅明确用户决定、发布政策或实际生效的自动化及其递增触发条件可支持 deferred；旧工程笔记保留作历史，不作为例外依据。
 - 固定统一版本：以根 `package.json` 为发布权威，`packages/core/package.json` 同步相同版本；依据为用户在 2026-09-17 本次刷新中明确选择“统一版本：根目录与 core 同步递增”。按整个完成需求的最高语义影响递增一次，不按包分别重复递增；`docs/package.json` 继续无版本。
 - 每个完整需求通过实现、验收、审查和文档检查后，仅评估一次版本影响；按 `kuVibe.md` §30.1 记录需求标识、基线、目标、语义/有效影响及版本来源，重试沿用原决定。范围明确且无有效例外时实际递增，同步相关清单、内部依赖、锁文件和 CHANGELOG；总结必须报告影响、结果、旧版本 → 新版本及原因。
 - KuVibe 安装版本独立保存在 `.agents/kuvibe.yaml`，仅在采用、刷新或迁移协议时更新；版本变更不授权提交、打标签或发布。
+
+## 交付与验收入口
+
+根目录提供 start:local/start:dev/start:prod/build/setup/test/typecheck/docs:* 及迁移命令，自动在 core 执行，环境文件仍放在 packages/core。后端为私有应用包 @kumvjs/kuvibe-admin-core；正式版本使用 GitHub Release，不发布 npm。可重复验收见 docs/guide/release-verification.md；团队提示词仍以 docs/guide/getting-started.md#团队统一使用方式 为统一入口。DTO 部分更新须使用 hasSubmittedField 区分 undefined 与显式 null，不能仅依据 Object.hasOwn。

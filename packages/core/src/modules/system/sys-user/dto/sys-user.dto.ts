@@ -9,6 +9,7 @@ function optionalNumber(value: unknown): number | undefined {
 
 export class QuerySysUserListDto {
   @ApiPropertyOptional({ description: '所属部门 ID', type: String })
+  @Transform(({ value }) => value === '' ? undefined : value)
   @IsOptional()
   @IsString()
   @MaxLength(19)

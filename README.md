@@ -52,7 +52,7 @@ pnpm start:local
 | `pnpm start:local` | 本地开发，读取 core 的 `.env.local` |
 | `pnpm start:dev` / `pnpm start:debug` | 开发监听 / 调试 |
 | `pnpm build` / `pnpm start:prod` | 构建 / 生产启动 |
-| `pnpm setup` | 交互初始化超级管理员 |
+| `pnpm setup` | 补齐基础数据并交互初始化超级管理员 |
 | `pnpm test` | 单元与 HTTP 契约测试 |
 | `pnpm typecheck` | 源码及测试类型检查 |
 | `pnpm lint:check` / `pnpm lint` | 只读检查 / 自动修复 |

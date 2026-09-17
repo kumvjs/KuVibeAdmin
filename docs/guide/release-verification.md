@@ -80,3 +80,15 @@ VBEN_TEST_SOURCE=/absolute/path/to/temporary-vben node scripts/e2e/vben-browser.
 ## 部署与恢复
 
 先备份数据库并审查待执行迁移，确认时间戳旧值确为 UTC，在维护窗口执行，再部署构建产物和环境配置。保持数据库名、schema、Redis 键与 API 前缀，品牌更名不迁移这些运行标识。回退应用版本前确认结构兼容性；时间戳迁移已提供 UTC 语义 down，但 DDL 的排他锁预算仍需在目标数据规模演练。正式版本由根目录及 core 清单同步，GitHub Release 发布源码；不向 npm 发布私有 core。
+
+## 初始化基础数据专项验证
+
+只使用独立测试实例，不连接业务数据库。测试自行创建随机数据库，以实体同步建立隔离测试表，并在 finally 中删除；该专项验证不替代迁移验收。
+
+```bash
+docker run -d --name kuvibeadmin-setup-postgres -e POSTGRES_PASSWORD=test_only -e POSTGRES_DB=setup_test -p 127.0.0.1:55439:5432 postgres:17.11
+SETUP_TEST_DATABASE_URL=postgres://postgres:test_only@127.0.0.1:55439/setup_test pnpm test:setup:integration
+docker rm -f kuvibeadmin-setup-postgres
+```
+
+覆盖四个系统管理页面、一个附件管理二级目录、五项旧权限原地归组及角色关联保留、21 个管理权限、普通角色授权清理、其他角色保留、实际动态路由与有效权限、重复执行、软删除/停用冲突及事务回滚。脚本交互与缓存失败路径由 `pnpm test --runInBand src/scripts` 验证。

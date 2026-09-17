@@ -212,6 +212,8 @@ tokenStore.setAccessToken(result.accessToken)
 
 菜单数据模型按 v5.7.0 的 `catalog | menu | embedded | link | button` 五类型建立，并以 JSONB 保存可扩展 `meta`；字段直接采用 Vben 语义，Bigint 菜单 ID 保持字符串，状态直接使用 `0 | 1`。旧菜单表数据不会迁移，需要重新初始化菜单与角色关联。
 
+`pnpm setup` 可补齐 System 目录及部门、菜单、角色、用户四页，组件分别为 `/system/{dept,menu,role,user}/list`；使用本项目小写 `system:*` 权限码（编辑为 `update`），前端按钮指令也须使用相同代码。不会复制 mock 的演示账户和权限。初始化及已有数据处理见[快速开始](../guide/getting-started.md#初始化基础数据与超级管理员)。
+
 `GET /menu/all` 已可直接供 Vben 的 `getAllMenusApi()` 使用。普通用户只获得启用角色授权的路由，并自动补齐完整的启用父路由；超级角色获得全部有效路由。按钮只用于权限码，不会作为路由返回。禁用、父链缺失、循环或没有 `path` 的分支会被排除，树中每一级按 `meta.order` 升序、再按唯一 `name` 排序。响应仍由全局 `ResOp` 包装，OpenAPI 客户端解包后业务结果就是 `RouteRecordStringComponent[]`。
 
 菜单写接口已开放：新增、修改、删除分别调用 `POST /system/menu`、`PUT /system/menu/:id`、`DELETE /system/menu/:id`，生成客户端解包后得到 boolean。按钮必须提供父级与 `authCode`；menu 必须提供本地 `path` 和组件；embedded/link 的目标必须是 HTTP(S) URL。后端会兼容顶层 `activePath`/`linkSrc` 并归入 `meta`，但不会信任前端的名称或路径预检查。

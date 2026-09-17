@@ -14,6 +14,9 @@ import { UserStatus } from '../modules/system/sys-user/sys-user.types.js'
 import SysUserRoleEntity from '../modules/user/entities/user-role.entity.js'
 import { SysUserEntity } from '../modules/user/entities/user.entity.js'
 
+import { clearSetupPermissions } from './setup-cache.js'
+import { initializeBaseData } from './setup-data.js'
+
 const SUPER_ROLE_NAME = 'super'
 const SECRET_KEYS = ['JWT_SECRET', 'REFRESH_TOKEN_SECRET'] as const
 
@@ -50,7 +53,7 @@ async function writeJwtSecrets(envPath: string): Promise<void> {
   }
 }
 
-async function createSuper(username: string, password: string): Promise<void> {
+async function createSuper(username: string, password: string, rootDeptId: string): Promise<void> {
   await dataSource.transaction(async (manager) => {
     const roleRepository = manager.getRepository(SysRoleEntity)
     const userRepository = manager.getRepository(SysUserEntity)
@@ -84,6 +87,7 @@ async function createSuper(username: string, password: string): Promise<void> {
     }
 
     const superUser = userRepository.create({
+      deptId: rootDeptId,
       name: username,
       username,
       sessionVersion: 1,
@@ -109,6 +113,15 @@ async function main(): Promise<void> {
 
   try {
     await dataSource.initialize()
+    const { rootDeptId, affectedUserIds } = await initializeBaseData(dataSource)
+    try {
+      await clearSetupPermissions(affectedUserIds)
+    }
+    catch {
+      throw new Error('基础数据已提交，但权限缓存清理失败。请保持服务停止，恢复 Redis 后重新运行 setup。')
+    }
+    stdout.write(`Base data initialized; default user role has no system management grants.${EOL}`)
+
     const existingSuper = await dataSource.getRepository(SysUserRoleEntity)
       .createQueryBuilder('userRole')
       .innerJoinAndSelect('userRole.user', 'user')
@@ -116,7 +129,7 @@ async function main(): Promise<void> {
       .where('role.code = :code', { code: Roles.SUPER })
       .getOne()
     if (existingSuper) {
-      stdout.write(`A user with the super role already exists: "${existingSuper.user.username}". Initialization skipped.${EOL}`)
+      stdout.write(`A user with the super role already exists: "${existingSuper.user.username}". Super account initialization skipped; base data completed.${EOL}`)
       return
     }
 
@@ -129,7 +142,7 @@ async function main(): Promise<void> {
       return
     }
 
-    await promptForSuper(envPath)
+    await promptForSuper(envPath, rootDeptId)
   }
   finally {
     if (dataSource.isInitialized)
@@ -137,7 +150,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function promptForSuper(envPath: string): Promise<void> {
+async function promptForSuper(envPath: string, rootDeptId: string): Promise<void> {
   let hideInput = false
   const mutedOutput = new Writable({
     write(chunk, encoding, callback) {
@@ -198,7 +211,7 @@ async function promptForSuper(envPath: string): Promise<void> {
       break
     }
 
-    await createSuper(username, password)
+    await createSuper(username, password, rootDeptId)
     await writeJwtSecrets(envPath)
 
     stdout.write(`Framework initialization completed.${EOL}`)

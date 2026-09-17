@@ -2,6 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { stdout } from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { parse } from 'dotenv'
+import { clearSetupPermissions } from './setup-cache.js'
+import { initializeBaseData } from './setup-data.js'
+
+jest.mock('./setup-cache.js', () => ({ clearSetupPermissions: jest.fn() }))
+jest.mock('./setup-data.js', () => ({ initializeBaseData: jest.fn() }))
 
 jest.mock('node:fs/promises', () => ({ readFile: jest.fn(), writeFile: jest.fn() }))
 jest.mock('node:readline/promises', () => ({ createInterface: jest.fn() }))
@@ -28,6 +33,8 @@ describe('初始化脚本', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.mocked(initializeBaseData).mockResolvedValue({ rootDeptId: '10', affectedUserIds: ['1'] })
+    jest.mocked(clearSetupPermissions).mockResolvedValue(undefined)
     delete process.env.JWT_SECRET
     delete process.env.REFRESH_TOKEN_SECRET
     process.exitCode = 0
@@ -94,14 +101,16 @@ describe('初始化脚本', () => {
     expect(database.destroy).toHaveBeenCalledTimes(1)
   }
 
-  it('通过 super 角色关联发现已有用户后直接退出', async () => {
+  it('已有超级用户时仍补齐基础数据并清理权限缓存', async () => {
     query.getOne.mockResolvedValue({ user: { username: 'custom-admin' } })
     await runSetup()
     expect(query.where).toHaveBeenCalledWith('role.code = :code', { code: 'super' })
+    expect(initializeBaseData).toHaveBeenCalledWith(database)
+    expect(clearSetupPermissions).toHaveBeenCalledWith(['1'])
     expect(createInterface).not.toHaveBeenCalled()
     expect(database.transaction).not.toHaveBeenCalled()
     expect(writeFile).not.toHaveBeenCalled()
-    expect(output).toHaveBeenCalledWith(expect.stringContaining('Initialization skipped'))
+    expect(output).toHaveBeenCalledWith(expect.stringContaining('Super account initialization skipped'))
   })
 
   it.each([{ status: 0 }, { status: 1, deletedAt: new Date() }])('已有不可用 super 角色时提示结束：%j', async (role) => {
@@ -116,6 +125,24 @@ describe('初始化脚本', () => {
     expect(userRepository.save).toHaveBeenCalledTimes(1)
     expect(writeFile).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('缓存清理失败时报告已提交状态并阻止创建账号', async () => {
+    jest.mocked(clearSetupPermissions).mockRejectedValueOnce(new Error('unavailable'))
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await jest.isolateModulesAsync(async () => {
+        await import('./setup.js')
+      })
+      await completed
+      await new Promise(resolve => setImmediate(resolve))
+      expect(process.exitCode).toBe(1)
+      expect(createInterface).not.toHaveBeenCalled()
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('基础数据已提交，但权限缓存清理失败'))
+    }
+    finally {
+      error.mockRestore()
+    }
   })
 
   it('只填充空密钥并保留另一密钥、注释及 CRLF', async () => {
@@ -142,7 +169,7 @@ describe('初始化脚本', () => {
     userRepository.findOne.mockResolvedValueOnce({ username: 'taken1' }).mockResolvedValue(null)
     await runSetup()
     expect(question).toHaveBeenCalledTimes(10)
-    expect(userRepository.create).toHaveBeenCalledWith(expect.objectContaining({ username: 'admin' }))
+    expect(userRepository.create).toHaveBeenCalledWith(expect.objectContaining({ username: 'admin', deptId: '10' }))
     expect(userRepository.create.mock.results[0].value.setPassword).toHaveBeenCalledWith('secret2')
     expect(close).toHaveBeenCalledTimes(1)
   })

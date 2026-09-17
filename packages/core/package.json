@@ -1,7 +1,7 @@
 {
   "name": "@kumvjs/kuvibe-admin-core",
   "type": "module",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "private": true,
   "description": "KuVibeAdmin NestJS 后端",
   "author": "",
@@ -37,7 +37,8 @@
     "test:release": "pnpm build && cross-env TYPEORM_TYPE=postgres node test/release.integration.mjs",
     "test:migration:integration": "pnpm build && node --test test/migration-timezone.integration.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
-    "lint:check": "eslint \"{src,test}/**/*.{ts,mjs}\""
+    "lint:check": "eslint \"{src,test}/**/*.{ts,mjs}\"",
+    "test:setup:integration": "pnpm build && node --test test/setup-data.integration.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

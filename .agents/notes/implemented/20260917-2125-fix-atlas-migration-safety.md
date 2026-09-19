@@ -23,6 +23,6 @@
 
 ## 版本与保留项
 
-patch / bumped：根 package.json 与 packages/core/package.json 1.1.0 → 1.1.1，修复迁移安全工作流和未执行迁移的数据丢失风险；CHANGELOG 已同步。锁文件不包含本地应用版本，依赖未变化，无需改锁。KuVibe schema/revision 不变。
+patch / bumped：根 package.json 与 packages/backend/package.json 1.1.0 → 1.1.1，修复迁移安全工作流和未执行迁移的数据丢失风险；CHANGELOG 已同步。锁文件不包含本地应用版本，依赖未变化，无需改锁。KuVibe schema/revision 不变。
 
 保留用户新增 migration:check 脚本、原有发布 active 目录与 Vben 计划，不扩大为正式发布。当前安装的 TypeORM CLI 未找到 migration:check 命令；该用户脚本未作为本次安全验证依据。

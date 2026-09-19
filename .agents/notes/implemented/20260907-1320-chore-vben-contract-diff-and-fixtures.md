@@ -41,7 +41,7 @@ M0.1 made the Vben v5.7.0 inventory reproducible, but it could not classify a ca
 - `diff --ref v5.7.0` against the same source reported no changes.
 - `warn-main --ref main` detected current upstream drift and exited with code 2 as designed. It reported request changes for `/auth/logout`, `/auth/refresh`, and `/upload`; response changes for `/timezone/setTimezone` and `/upload`; and 25 source changes.
 - `git diff --check`
-- Confirmed `docs/frontend/vben.md` and `packages/core` were unchanged.
+- Confirmed `docs/frontend/vben.md` and `packages/backend` were unchanged.
 
 ## Documentation impact
 

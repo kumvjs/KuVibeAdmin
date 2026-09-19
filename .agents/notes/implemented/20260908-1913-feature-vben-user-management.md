@@ -42,7 +42,7 @@ Timestamp: `2026-09-08T19:13:51+08:00`
 
 - M5/Auth focused Jest: 8 suites / 41 tests passed。
 - Core full Jest: 31 suites / 180 tests passed（Node ESM 依赖下通过 `NODE_OPTIONS=--experimental-vm-modules` 执行）。
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed。
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed。
 - M5 changed-file ESLint passed。
 - Nest build passed。
 - Vben contract parser tests（3/3）、v5.7.0 locked contract check 和同 tag diff 均通过；同 tag 无接口变化。

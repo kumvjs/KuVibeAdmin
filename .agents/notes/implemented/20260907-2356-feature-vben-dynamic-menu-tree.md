@@ -18,7 +18,7 @@
 
 - 菜单范围 Jest：4 suites / 17 tests passed。
 - Core 全量 Jest：13 suites / 50 tests passed。
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed。
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed。
 - 变更范围 ESLint passed。
 - Nest build passed。
 - Vben contract parser：3 tests passed。

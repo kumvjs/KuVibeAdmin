@@ -36,7 +36,7 @@ Timestamp: `2026-09-08T13:41:49+08:00`
 
 - 部门聚焦 Jest：5 suites / 26 tests passed。
 - Core 全量 Jest：21 suites / 124 tests passed。
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed。
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed。
 - 本批所有改动 TypeScript 文件 ESLint passed。
 - Nest build passed。
 - Vben contract parser：3 tests passed。

@@ -10,4 +10,4 @@
 
 验证：隔离 PostgreSQL 集成通过，覆盖新目录、全部五项原地归组、角色关联保留、默认权限清理、重复执行与非预期父级冲突；pnpm typecheck、构建、改动文件 ESLint 和 git diff --check 通过。未进行实际前端浏览器验收。更新快速开始和专项验证说明，v2 活动规划保留。
 
-版本决定：attachment-menu，patch / bumped，根 package.json 与 packages/core/package.json 统一 1.2.1 → 1.2.2；修复权限归组并兼容旧初始化数据。CHANGELOG 同步，无依赖变化，锁文件无需更新，KuVibe schema/revision 不变。未提交或发布。
+版本决定：attachment-menu，patch / bumped，根 package.json 与 packages/backend/package.json 统一 1.2.1 → 1.2.2；修复权限归组并兼容旧初始化数据。CHANGELOG 同步，无依赖变化，锁文件无需更新，KuVibe schema/revision 不变。未提交或发布。

@@ -73,6 +73,6 @@ const displayTimezone = savedTimezone ?? deviceTimezone
 
 ## 验证
 
-- `TYPEORM_TYPE=postgres node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand`（在 packages/core 中执行；当前安装的 ESM 依赖需要 VM Modules）。
+- `TYPEORM_TYPE=postgres node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand`（在 packages/backend 中执行；当前安装的 ESM 依赖需要 VM Modules）。
 - 构建后运行 `node --test test/timezone.integration.mjs`：跨进程 TZ 和实体类型检查无需数据库。
 - 设置 `TIMEZONE_TEST_DATABASE_URL` 指向 localhost 上独立的 `m6_test` 数据库可追加真实持久化与跨会话时区验证；测试只创建并清理随机 m6 schema，禁止指向业务数据库。

@@ -13,7 +13,7 @@
 pnpm install
 ```
 
-复制 `packages/core/.env.example` 为 `packages/core/.env.local`，至少填写 PostgreSQL、Redis、`JWT_SECRET` 和 `REFRESH_TOKEN_SECRET`。本地启动脚本会设置 `NODE_ENV=local`，因此优先读取 `.env.local`。
+复制 `packages/backend/.env.example` 为 `packages/backend/.env.local`，至少填写 PostgreSQL、Redis、`JWT_SECRET` 和 `REFRESH_TOKEN_SECRET`。本地启动脚本会设置 `NODE_ENV=local`，因此优先读取 `.env.local`。
 
 ::: warning 不要提交密钥
 `.env.local` 已被 Git 忽略。生产环境应由密钥管理系统注入配置，不要沿用示例值。
@@ -52,7 +52,7 @@ pnpm migration:run
 历史时间语义：<UTC / 其他已确认时区 / 不确定 / 不涉及>
 
 先确认连接目标、schema 和迁移基线，关闭 synchronize 和 migrationsRun。
-在 packages/core 执行 pnpm migration:generate，然后继续审查和修正生成文件。
+在 packages/backend 执行 pnpm migration:generate，然后继续审查和修正生成文件。
 保留已有数据，检查 up/down、约束、索引、锁及新旧应用兼容性。
 在隔离 PostgreSQL 中用代表性旧数据验证升级、回滚或前向恢复，检查最终结构与实体一致。
 交付迁移文件、验证结果、上线步骤、恢复方案及未验证项，不执行生产迁移。
@@ -63,7 +63,7 @@ pnpm migration:run
 
 ```text
 使用本项目 .agents/skills/atlas/SKILL.md，审查并修正已有迁移。
-迁移文件：packages/core/src/migrations/<实际文件名>.ts
+迁移文件：packages/backend/src/migrations/<实际文件名>.ts
 执行状态：<未执行 / 执行失败且已回滚 / 已执行 / 不确定>
 历史时间语义：<UTC / 其他已确认时区 / 不确定 / 不涉及>
 失败日志：<有则提供，移除凭据>
@@ -89,7 +89,7 @@ pnpm migration:run
 
 Atlas CLI 及其许可独立安装/配置；当前官方 `migrate lint` 需要 Pro 授权。TypeORM 的 `.ts` 迁移不能直接传给 Atlas SQL lint，需准备完整基线和候选 SQL 验证副本。Atlas 不可用时记录未执行，继续隔离库数据验证，不把跳过当作通过。生产执行仍由部署流程负责；当前 pnpm TypeORM 脚本固定读取 local 环境。
 
-`1789648814246-update-table.ts` 按已确认的 UTC 历史语义原地转换时间列，并保留已有索引。其带数据往返测试为 `packages/core/test/migration-timezone.integration.mjs`，构建后通过 `MIGRATION_TEST_DATABASE_URL` 指向本次新建的本地 `atlas_migration_test` 空数据库，再执行 `node --test test/migration-timezone.integration.mjs`（工作目录为 core）。测试使用事务并最终回滚，不接受日常数据库名称。
+`1789648814246-update-table.ts` 按已确认的 UTC 历史语义原地转换时间列，并保留已有索引。其带数据往返测试为 `packages/backend/test/migration-timezone.integration.mjs`，构建后通过 `MIGRATION_TEST_DATABASE_URL` 指向本次新建的本地 `atlas_migration_test` 空数据库，再执行 `node --test test/migration-timezone.integration.mjs`（工作目录为 core）。测试使用事务并最终回滚，不接受日常数据库名称。
 
 该迁移仍需排他锁，不能直接视为零停机方案。部署前确认目标尚未执行此迁移、历史值确为 UTC、备份可恢复，并在生产规模副本测量耗时；为迁移连接配置明确的锁等待/语句超时预算。暂停受影响写入并在维护窗口执行，完成后验证结构、数据和应用读写再恢复服务。若业务不能接受窗口，应拆成新列、兼容读写、分批回填和切换的分阶段发布。回滚使用相同 UTC 语义，回滚应用与数据库需保持兼容；不要在业务已依赖新模型后直接执行 revert。
 
@@ -127,7 +127,7 @@ pnpm start:prod
 
 启动完成应看到 `Server running on http://127.0.0.1:7001`（端口由 `APP_PORT` 决定）。`Nest application successfully started` 仅表示 Nest 初始化完成，不能单独作为端口可访问的依据。可访问 `/api-docs`（启用 Swagger 时）验证 HTTP 服务；非生产环境启用 Playground 时也可请求 `/api/status`。
 
-本项目通过显式导入并注册 `@fastify/static` 提供静态资源，规避当前 Nest 12 `useStaticAssets()` 传递模块命名空间导致启动挂起的问题。保留 `/uploads` 访问限制。静态目录固定为 `packages/core/public`（部署时为应用根目录下的 `public`），与 `dist` 同级，不随构建清理；无需配置，首次启动自动创建。入口为 `src/main.ts`、`dist/main.js` 或 `dist/src/main.js` 时均定位到同一目录，不使用启动工作目录兜底。输出布局由 TypeScript/CLI 配置决定，当前 `rootDir: "./"` 对应 `dist/src/main.js`，本地 watch 同样运行编译产物。系统附件仍由上传模块在 `var/attachments` 下按需创建，不能放进公开静态目录。
+本项目通过显式导入并注册 `@fastify/static` 提供静态资源，规避当前 Nest 12 `useStaticAssets()` 传递模块命名空间导致启动挂起的问题。保留 `/uploads` 访问限制。静态目录固定为 `packages/backend/public`（部署时为应用根目录下的 `public`），与 `dist` 同级，不随构建清理；无需配置，首次启动自动创建。入口为 `src/main.ts`、`dist/main.js` 或 `dist/src/main.js` 时均定位到同一目录，不使用启动工作目录兜底。输出布局由 TypeScript/CLI 配置决定，当前 `rootDir: "./"` 对应 `dist/src/main.js`，本地 watch 同样运行编译产物。系统附件仍由上传模块在 `var/attachments` 下按需创建，不能放进公开静态目录。
 
 ## 启动文档站
 
@@ -144,7 +144,7 @@ pnpm docs:preview
 
 ## 根目录常用命令
 
-全部后端命令自动在 `packages/core` 执行；环境文件仍放在该目录。
+全部后端命令自动在 `packages/backend` 执行；环境文件仍放在该目录。
 
 | 命令 | 用途 |
 | --- | --- |

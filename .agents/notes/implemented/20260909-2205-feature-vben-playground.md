@@ -38,7 +38,7 @@ Timestamp: `2026-09-09T22:05:22+08:00`
 
 - Playground focused Jest: 4 suites / 15 tests passed。
 - Core full Jest: 35 suites / 195 tests passed（通过 `NODE_OPTIONS=--experimental-vm-modules` 执行）。
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed。
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed。
 - M7 changed-file ESLint passed。
 - Nest build passed。
 - Vben contract parser tests: 3/3 passed。

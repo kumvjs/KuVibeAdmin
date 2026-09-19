@@ -36,7 +36,7 @@ The existing authentication implementation already handled login, refresh-token 
 ## Verification
 
 - Focused Jest: 2 suites and 5 tests passed.
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed.
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed.
 - Focused ESLint passed.
 - Nest application build passed.
 - Locked Vben snapshot and frozen fixtures passed `vben-contract check`.

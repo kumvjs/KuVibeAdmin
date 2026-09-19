@@ -29,10 +29,10 @@ Vben 兼容基线为 `v5.7.0`，完整 commit 固定在 [upstream.lock.json](con
 git clone https://github.com/kumvjs/KuVibeAdmin.git
 cd KuVibeAdmin
 pnpm install
-cp packages/core/.env.example packages/core/.env.local
+cp packages/backend/.env.example packages/backend/.env.local
 ```
 
-编辑 `packages/core/.env.local`，配置数据库、Redis 和随机的 `JWT_SECRET` / `REFRESH_TOKEN_SECRET`。创建相应数据库及 schema 后，在**仓库根目录**执行：
+编辑 `packages/backend/.env.local`，配置数据库、Redis 和随机的 `JWT_SECRET` / `REFRESH_TOKEN_SECRET`。创建相应数据库及 schema 后，在**仓库根目录**执行：
 
 ```bash
 pnpm migration:show

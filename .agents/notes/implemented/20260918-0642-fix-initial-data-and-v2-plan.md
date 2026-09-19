@@ -31,6 +31,6 @@
 
 ## 版本与完成检查
 
-变更集 initial-data：patch / bumped；根 package.json 与 packages/core/package.json 统一 1.2.0 → 1.2.1。原因是已交付模块初始化缺失与普通角色过度授权修复。无依赖变动，pnpm lockfile 无项目版本字段，无需重写。CHANGELOG 同步，KuVibe schema/revision/安装版本不变。
+变更集 initial-data：patch / bumped；根 package.json 与 packages/backend/package.json 统一 1.2.0 → 1.2.1。原因是已交付模块初始化缺失与普通角色过度授权修复。无依赖变动，pnpm lockfile 无项目版本字段，无需重写。CHANGELOG 同步，KuVibe schema/revision/安装版本不变。
 
 v2：deferred，依据用户明确仅规划；2.x 递增待实现与发布验收决策，不提前修改实际版本。本次初始化实现、验收、审查、文档和版本门禁完成，活动初始化计划合并至本笔记；v2 未进入开发，保留活动目录。未提交、打标签或发布。

@@ -28,5 +28,5 @@
 
 - 需求实现、回归、只读验收、差异审查及文档检查完成。
 - 变更集 `fix-migration-schema-20260916`，语义影响 patch（兼容修复）。有效递增 deferred，遵循 `.agents/project.md` 开发期约定。
-- 基线与目标均为根 `package.json` 1.0.0、`packages/core/package.json` 0.0.1；不改依赖，锁文件无需同步。无既有产品 CHANGELOG，不新增发布条目。
+- 基线与目标均为根 `package.json` 1.0.0、`packages/backend/package.json` 0.0.1；不改依赖，锁文件无需同步。无既有产品 CHANGELOG，不新增发布条目。
 - KuVibe schema、模板 revision 和安装状态无变更。

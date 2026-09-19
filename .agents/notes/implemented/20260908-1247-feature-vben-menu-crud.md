@@ -36,7 +36,7 @@ M2.3–M2.5 已提供动态菜单、管理树和名称/路径预检查，但 Vbe
 
 - 菜单聚焦 Jest：7 suites / 65 tests passed。
 - Core 全量 Jest：16 suites / 98 tests passed。
-- `tsc -p packages/core/tsconfig.spec.json --noEmit` passed。
+- `tsc -p packages/backend/tsconfig.spec.json --noEmit` passed。
 - 本批所有改动 TypeScript 文件 ESLint passed。
 - Nest build passed。
 - Vben contract parser：3 tests passed。

@@ -25,7 +25,7 @@
 
 ## 版本决策
 
-变更集 M6-timezone-tools；根 package.json 与 packages/core/package.json 基线均为 1.0.1，目标统一 1.1.0。语义/有效影响 minor：新增偏好 API、可选统一工具及开发阶段时间点类型规范，无历史兼容要求。KuVibe schema/revision 不变；通过验证后同步版本与 CHANGELOG，重试沿用此基线。
+变更集 M6-timezone-tools；根 package.json 与 packages/backend/package.json 基线均为 1.0.1，目标统一 1.1.0。语义/有效影响 minor：新增偏好 API、可选统一工具及开发阶段时间点类型规范，无历史兼容要求。KuVibe schema/revision 不变；通过验证后同步版本与 CHANGELOG，重试沿用此基线。
 
 ## 实现与验证结果
 
@@ -40,4 +40,4 @@
 
 ## 完成版本
 
-变更集 M6-timezone-tools；semantic/effective impact minor；outcome bumped。package.json 1.0.1 → 1.1.0；packages/core/package.json 1.0.1 → 1.1.0。无依赖变化或锁文件内根包版本字段，锁文件不需重写。CHANGELOG 已同步。KuVibe release/schema/template revision 保持不变。未提交、打标签或发布。
+变更集 M6-timezone-tools；semantic/effective impact minor；outcome bumped。package.json 1.0.1 → 1.1.0；packages/backend/package.json 1.0.1 → 1.1.0。无依赖变化或锁文件内根包版本字段，锁文件不需重写。CHANGELOG 已同步。KuVibe release/schema/template revision 保持不变。未提交、打标签或发布。

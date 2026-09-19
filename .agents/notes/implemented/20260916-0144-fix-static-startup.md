@@ -26,4 +26,4 @@
 
 ## 版本影响与完成检查
 
-变更集：static-startup-20260916。语义影响 patch（兼容启动修复）。产品版本来源及基线：根 package.json 1.0.0、packages/core/package.json 0.0.1；目标保持原值，有效递增 deferred，遵循项目既有开发期延后发布约定。无既有 CHANGELOG，未新增发布记录；KuVibe schema 2、release 0.3.2 及模板 revision 不变。需求、构建、实际 HTTP 验收、差异审查、文档影响和版本一致性检查完成。
+变更集：static-startup-20260916。语义影响 patch（兼容启动修复）。产品版本来源及基线：根 package.json 1.0.0、packages/backend/package.json 0.0.1；目标保持原值，有效递增 deferred，遵循项目既有开发期延后发布约定。无既有 CHANGELOG，未新增发布记录；KuVibe schema 2、release 0.3.2 及模板 revision 不变。需求、构建、实际 HTTP 验收、差异审查、文档影响和版本一致性检查完成。

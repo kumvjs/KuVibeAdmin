@@ -1,10 +1,10 @@
 # 内置公共能力
 
-`packages/core/src/common` 提供控制器、DTO 与基础设施共用的装饰器、管道（Pipe）、响应模型和异常处理。本页示例在 `packages/core` 内使用，导入沿用 `#/` 别名和 ESM `.js` 后缀。
+`packages/backend/src/common` 提供控制器、DTO 与基础设施共用的装饰器、管道（Pipe）、响应模型和异常处理。本页示例在 `packages/backend` 内使用，导入沿用 `#/` 别名和 ESM `.js` 后缀。
 
 ## 能力索引
 
-以下路径均相对于 `packages/core/src/common/`。
+以下路径均相对于 `packages/backend/src/common/`。
 
 | 目录 | 内置能力 | 用途 |
 | --- | --- | --- |

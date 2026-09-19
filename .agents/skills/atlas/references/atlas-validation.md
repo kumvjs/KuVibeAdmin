@@ -1,6 +1,6 @@
 # Atlas 检查接入
 
-权威迁移为 packages/core/src/migrations/*.ts，不能直接把该目录传给 Atlas SQL migration lint。Skill 不是 TypeORM 插件，不额外维护生产 Atlas 迁移历史。
+权威迁移为 packages/backend/src/migrations/*.ts，不能直接把该目录传给 Atlas SQL migration lint。Skill 不是 TypeORM 插件，不额外维护生产 Atlas 迁移历史。
 
 ## 前置检查
 

@@ -54,6 +54,6 @@
 
 当前事实同步 README、快速开始、概览、Vben 接入、认证/数据/附件和发布验收文档。团队提示词唯一入口仍为 docs/guide/getting-started.md#团队统一使用方式。
 
-minor / bumped：根 package.json 与 packages/core/package.json 均 1.1.1 → 1.2.0，最高影响来自新增根目录工程命令和发布验收入口，其余为兼容修复。中断前原候选 1.1.1 未应用，本次不覆盖已完成 Atlas 需求；CHANGELOG 保留其独立条目。锁文件不记录本地应用版本、依赖未变化，冻结安装验证通过。KuVibe 0.3.3 / schema 2 / 模板 revision 不变。
+minor / bumped：根 package.json 与 packages/backend/package.json 均 1.1.1 → 1.2.0，最高影响来自新增根目录工程命令和发布验收入口，其余为兼容修复。中断前原候选 1.1.1 未应用，本次不覆盖已完成 Atlas 需求；CHANGELOG 保留其独立条目。锁文件不记录本地应用版本、依赖未变化，冻结安装验证通过。KuVibe 0.3.3 / schema 2 / 模板 revision 不变。
 
 用户已授权 GitHub 更名、提交、标签与正式发布。正式标签为 v1.2.0，发布入口：https://github.com/kumvjs/KuVibeAdmin/releases/tag/v1.2.0 。GitHub Release 发布源码，不执行 npm publish 或用户生产数据库迁移；发布状态以远程标签和 Release 为准。

@@ -8,6 +8,14 @@ export abstract class CommonEntity extends BaseEntity {
   @ApiProperty({ description: 'id' })
   id!: string
 
+  @Column({
+    name: 'tenant_id',
+    type: 'bigint',
+    default: 1,
+  })
+  @ApiProperty({ type: String, description: '租户 ID（预留）', default: '1' })
+  tenantId: string = '1'
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamptz',

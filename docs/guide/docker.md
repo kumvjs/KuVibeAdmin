@@ -31,6 +31,33 @@ docker compose up -d --wait backend
 
 ## 配置与持久化
 
+### 源码热更新开发环境
+
+开发环境使用独立 Compose 项目 `kuvibe-admin-dev`、根 `.env.docker.dev` 和独立数据卷，默认后端 `http://localhost:17001`、PostgreSQL `127.0.0.1:55432`、Redis `127.0.0.1:56379`。数据库/Redis端口只绑定回环地址，开发密钥与本地/生产配置分开。
+
+```bash
+node scripts/docker-init.mjs --dev
+node scripts/docker-dev.mjs build backend
+node scripts/docker-dev.mjs up -d --wait postgres redis
+node scripts/docker-dev.mjs run --rm migrate
+node scripts/docker-dev.mjs run --rm setup
+node scripts/docker-dev.mjs up -d --wait backend
+```
+
+`setup`交互创建管理员；不提供默认密码。源码和测试以只读bind mount进入容器，Nest watch编译产物写在容器内，Linux依赖不与宿主机node_modules混用。修改源码后自动编译/重启；清单/锁文件或Dockerfile改变后重新build。Windows挂载使用TypeScript轮询监听。
+
+```bash
+node scripts/docker-dev.mjs logs -f backend
+node scripts/docker-dev.mjs exec backend pnpm typecheck
+node scripts/docker-dev.mjs exec backend pnpm test --runInBand
+node scripts/docker-dev.mjs ps
+node scripts/docker-dev.mjs down
+```
+
+Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要在开发过程中删除数据卷。修改实体不会自动建表，迁移仍显式审查/执行。专用积分测试库与开发库分开，测试不能清理开发用户/账本。
+
+覆盖文件的合并方式参见[Docker Compose文档](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/)，只读源码挂载参见[bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)。
+
 | 配置 | 默认值 / 行为 |
 | --- | --- |
 | `DOCKER_HTTP_BIND` / `DOCKER_HTTP_PORT` | `127.0.0.1:7001`，仅发布后端；容器内部 `APP_PORT` 固定为 `7001` |

@@ -8,6 +8,7 @@ import { envValidationSchema } from './config/env.validation.js'
 import config from './config/index.js'
 import { AiModule } from './modules/ai/ai.module.js'
 import { AuthModule } from './modules/auth/auth.module.js'
+import { BillingModule } from './modules/billing/billing.module.js'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js'
 import { RbacGuard } from './modules/auth/guards/rbac.guard.js'
 import { TrustedOriginGuard } from './modules/auth/guards/trusted-origin.guard.js'
@@ -34,6 +35,7 @@ import { SharedModule } from './shared/shared.module.js'
     DatabaseModule,
     AuthModule,
     UserModule,
+    BillingModule,
     TimezoneModule,
     AiModule,
     SystemModule,

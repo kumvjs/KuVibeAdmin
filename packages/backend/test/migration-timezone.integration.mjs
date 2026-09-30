@@ -16,7 +16,8 @@ test('UTC 历史数据在非 UTC 会话中升级、回滚、再次升级均保�
     type: 'postgres',
     url: url.toString(),
     synchronize: false,
-    entities: ['dist/src/**/*.entity.js'],
+    // 此测试验证历史基线，后续积分等模块由自己的迁移测试覆盖。
+    entities: ['dist/src/modules/auth/**/*.entity.js', 'dist/src/modules/user/**/*.entity.js', 'dist/src/modules/system/**/*.entity.js', 'dist/src/modules/upload/**/*.entity.js'],
   }).initialize()
   const runner = source.createQueryRunner()
   try {

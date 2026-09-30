@@ -1,0 +1,35 @@
+# 使用 pnpm docker:dev -- <命令>，与普通 Compose 的容器/数据卷隔离。
+name: kuvibe-admin-dev
+
+x-development: &development
+  image: kuvibe-admin-backend:dev
+  build:
+    target: development
+  environment:
+    NODE_ENV: development
+  volumes:
+    - ./packages/backend/src:/app/src:ro
+    - ./packages/backend/types:/app/types:ro
+    - ./packages/backend/test:/app/test:ro
+    - ./packages/backend/tsconfig.json:/app/tsconfig.json:ro
+    - ./packages/backend/tsconfig.build.json:/app/tsconfig.build.json:ro
+    - ./packages/backend/tsconfig.spec.json:/app/tsconfig.spec.json:ro
+    - ./packages/backend/nest-cli.json:/app/nest-cli.json:ro
+    - ./packages/backend/eslint.config.mjs:/app/eslint.config.mjs:ro
+
+services:
+  backend:
+    <<: *development
+    command: ['pnpm', 'start:dev']
+  postgres:
+    ports:
+      - '127.0.0.1:${DOCKER_POSTGRES_PORT:-55432}:5432'
+  redis:
+    ports:
+      - '127.0.0.1:${DOCKER_REDIS_PORT:-56379}:6379'
+  migrate:
+    <<: *development
+    command: ['/bin/sh', '-c', 'pnpm build && exec node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:run']
+  setup:
+    <<: *development
+    command: ['/bin/sh', '-c', 'pnpm build && touch .env.development && exec node dist/src/scripts/setup.js']

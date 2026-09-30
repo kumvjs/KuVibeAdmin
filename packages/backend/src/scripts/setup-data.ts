@@ -1,6 +1,7 @@
 import type { DataSource, EntityManager } from 'typeorm'
 import { In, IsNull } from 'typeorm'
 import { Roles } from '../modules/auth/auth.constant.js'
+import { POINT_PERMISSIONS } from '../modules/billing/points/points.types.js'
 import { DEPT_PERMISSIONS, DeptStatus } from '../modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '../modules/system/dept/entities/dept.entity.js'
 import { SysMenuEntity } from '../modules/system/menu/entities/menu.entity.js'
@@ -48,6 +49,16 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['UploadPolicyRead', '查看上传策略', UPLOAD_POLICY_PERMISSIONS.READ],
     ['UploadPolicyWrite', '配置上传策略', UPLOAD_POLICY_PERMISSIONS.WRITE],
   ] as const).map(([name, title, authCode]): SeedMenu => ({ name, parent: 'SystemAttachment', authCode, type: MenuType.BUTTON, meta: { title } })),
+  { name: 'SystemPoints', parent: 'System', path: '/system/points', type: MenuType.CATALOG, meta: { title: '积分管理', icon: 'lucide:coins', order: 5 } },
+  ...([
+    ['Read', '查看账户与流水', POINT_PERMISSIONS.READ],
+    ['Grant', '增加积分', POINT_PERMISSIONS.GRANT],
+    ['Debit', '扣减积分', POINT_PERMISSIONS.DEBIT],
+    ['Freeze', '冻结积分', POINT_PERMISSIONS.FREEZE],
+    ['Capture', '核销冻结积分', POINT_PERMISSIONS.CAPTURE],
+    ['Unfreeze', '解冻积分', POINT_PERMISSIONS.UNFREEZE],
+    ['Reverse', '冲正积分', POINT_PERMISSIONS.REVERSE],
+  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Points${suffix}`, parent: 'SystemPoints', authCode, type: MenuType.BUTTON, meta: { title } })),
 ]
 
 async function seedMenus(manager: EntityManager): Promise<void> {

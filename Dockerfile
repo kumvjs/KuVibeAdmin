@@ -18,6 +18,19 @@ COPY packages/backend/src ./src
 COPY packages/backend/types ./types
 RUN pnpm build
 
+FROM build AS development
+COPY --chown=node:node docker/healthcheck.mjs ./docker/healthcheck.mjs
+RUN mkdir -p var/attachments public \
+    && chown node:node /app /app/var /app/var/attachments /app/public \
+    && chown -R node:node /app/dist
+ENV NODE_ENV=development APP_PORT=7001 \
+    TSC_WATCHFILE=DynamicPriorityPolling TSC_WATCHDIRECTORY=DynamicPriorityPolling
+USER node
+EXPOSE 7001
+HEALTHCHECK --interval=10s --timeout=10s --start-period=90s --retries=6 \
+    CMD ["node", "docker/healthcheck.mjs"]
+CMD ["pnpm", "start:dev"]
+
 FROM dependencies AS production-dependencies
 RUN --mount=type=cache,id=kuvibe-admin-pnpm,target=/pnpm/store \
     pnpm install --prod --frozen-lockfile --store-dir=/pnpm/store

@@ -59,6 +59,7 @@ export function ApiResult<TModel extends Type<any>>(options: ApiResultOptions<TM
         allOf: [
           { $ref: getSchemaPath(ResOp) }, // 继承基础结构 code, message, success
           {
+            required: ['data'],
             properties: {
               data: nullable ? { ...dataSchema, nullable: true } : dataSchema, // 动态覆盖 data 字段的类型
             },

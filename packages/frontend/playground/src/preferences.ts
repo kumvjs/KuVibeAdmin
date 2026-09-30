@@ -22,7 +22,7 @@ export const overridesPreferences = defineOverridesPreferences({
     accessMode: 'backend',
     defaultHomePath: '/account/points',
     enableRefreshToken: true,
-    name: import.meta.env.VITE_APP_TITLE,
+    name: import.meta.env.VITE_APP_TITLE || 'KuVibeAdmin',
   },
   copyright: appCopyrightPreferences,
 });

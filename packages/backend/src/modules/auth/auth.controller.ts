@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { BrowserSecurityConfig, SecurityConfig } from '#/config/index.js'
 import { Body, Controller, Get, Headers, Inject, Post, Req, Res } from '@nestjs/common'
-import { ApiOperation } from '@nestjs/swagger'
+import { ApiHeader, ApiOperation } from '@nestjs/swagger'
 import { ERROR_CODES } from '#/common/constants/error-code.constant.js'
 import { ApiResult } from '#/common/decorators/api-result.decorator.js'
 import { CurrentUser } from '#/common/decorators/current-user.decorator.js'
@@ -27,6 +27,7 @@ export class AuthController {
   @Post('login')
   @Public()
   @ApiOperation({ summary: '登录' })
+  @ApiHeader({ name: 'user-agent', required: false, description: '浏览器自动提供' })
   @ApiResult({ status: 201, type: LoginTokenResponseDto })
   async login(@Body() dto: LoginDto, @GetIp() ip: string, @Headers('user-agent') ua: string, @Res({ passthrough: true }) res: FastifyReply): Promise<LoginTokenResponseDto> {
     // await this.captchaService.checkImgCaptcha(dto.captchaId, dto.verifyCode)

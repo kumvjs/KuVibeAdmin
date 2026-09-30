@@ -4,7 +4,7 @@
 
 ## Product
 
-KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。后端与仓库内 Vben playground 已接入真实积分/充值业务，其他前端示例仍独立；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
+KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。后端与仓库内 Vben playground 独立 OpenAPI 生成客户端，已接入真实积分/充值业务，其他前端示例仍独立；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
 
 ## Users and domain
 

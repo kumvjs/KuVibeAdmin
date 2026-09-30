@@ -1,144 +1,40 @@
 # Vben Admin 对接
 
-项目后端已覆盖 Vben 登录、动态菜单、系统管理和非生产 Playground 演示接口。前端仍需配置响应解包、Cookie、刷新逻辑和用户表单字段；M6 已提供用户展示时区偏好，默认跟随设备；接入方式和日期范围工具见[时间与时区开发](../guide/timezone.md)。
+项目后端已覆盖 Vben 登录、动态菜单、系统管理和非生产 Playground 演示接口。Playground 新业务已可使用生成客户端完成响应解包、Cookie 和 Access Token 传递；现有 Vben 页面仍需适配刷新逻辑和用户表单字段；M6 已提供用户展示时区偏好，默认跟随设备；接入方式和日期范围工具见[时间与时区开发](../guide/timezone.md)。
 
-## OpenAPI-TS 快速对接
+## Playground OpenAPI-TS 对接
 
-推荐让 Vben 直接从本项目 Swagger 生成请求函数和类型，再通过一个很薄的 `apiClient` 复用 Vben 的 Axios 实例并统一解包 `ResOp.data`。
+Playground 已内置独立的生成客户端，站点标题为 KuVibeAdmin。原有 `src/api` 和 `baseRequestClient` 保持 Vben 的现有行为；新业务从 `src/services` 引入生成的函数和 `apiRequest`。
 
-### 1. 启动 Swagger 并安装生成器
+### 生成契约和客户端
 
-确认后端启用了 `SWAGGER_ENABLE=true`，Swagger JSON 默认地址为：
-
-```text
-http://127.0.0.1:7001/api-docs/json
-```
-
-在 Vben 应用中安装 `@hey-api/openapi-ts` 和 Axios 插件，并增加脚本：
-
-```json
-{
-  "scripts": {
-    "openapi-ts": "openapi-ts"
-  },
-  "devDependencies": {
-    "@hey-api/client-axios": "^0.9.1",
-    "@hey-api/openapi-ts": "^0.98.1"
-  }
-}
-```
-
-### 2. 添加生成配置
-
-在 Vben 应用目录创建 `openapi-ts.config.ts`：
-
-```ts
-import { defineConfig } from '@hey-api/openapi-ts'
-
-export default defineConfig({
-  input: 'http://127.0.0.1:7001/api-docs/json',
-  output: 'src/client',
-  plugins: [
-    {
-      name: '@hey-api/client-axios',
-      throwOnError: true,
-    },
-    {
-      name: '@hey-api/sdk',
-      operations: { strategy: 'flat' },
-    },
-  ],
-})
-```
-
-执行生成：
+后端在 `SWAGGER_ENABLE=true` 启动并创建 Swagger 文档时，同步将同一份 OpenAPI 文档原子写入 `packages/backend/openapi/openapi.json`。此文件是本地生成产物，不提交。`SWAGGER_ENABLE=false` 时不创建文档也不写文件；旧快照不会自动删除，因此生成前应确认后端已开启 Swagger 并重新启动。启动仍需要正常的 PostgreSQL 与 Redis。默认 HTTP 文档为 `http://127.0.0.1:7001/api-docs/json`。
 
 ```bash
-pnpm openapi-ts
+pnpm --dir packages/backend start:local
+pnpm --dir packages/frontend --filter @vben/playground openapi-ts
 ```
 
-`src/client` 是生成目录，应通过重新执行命令更新，不要手工修改其中的请求函数和 DTO。
+前端生成器从本地 JSON 读取契约，配置在 `packages/frontend/playground/openapi-ts.config.ts`。生成目录为 `src/services/generated`，每次执行会整体更新，不手工修改生成文件。请求函数按 Swagger tag 写入 `generated/services/*.gen.ts`，每组请求类型写入 `generated/types/*.gen.ts`，公共 DTO 单独写入 `generated/models/*.gen.ts`。文件名自动从 JSON 中的 tag 生成纯 ASCII 名称；纯中文 tag 使用该组 `operationId` 的公共前缀，仍无法推导时用稳定哈希。清理后同名的 tag 会追加稳定哈希。生成器保留根 `generated/index.ts` 作为统一导出入口；若新接口的 `operationId` 与现有接口重名，应在后端 Swagger 契约中保持全局唯一，再重新生成。
 
-### 3. 让生成客户端复用 Vben 请求实例
+无数据库的生成器验证可在后端构建后执行 `TYPEORM_TYPE=postgres node test/openapi-client-fixture.mjs`，它从真实控制器元数据导出测试契约，仅供本地验证生成流程，不替代运行中应用生成的文档。
 
-`request.ts` 中的 `requestClient` 必须安装 Vben 的统一响应拦截器：
+### 业务调用
 
-```ts
-requestClient.addResponseInterceptor(
-  defaultResponseInterceptor({
-    codeField: 'code',
-    dataField: 'data',
-    successCode: 0,
-  }),
-)
-```
-
-然后创建 `src/api/api-client.ts`：
+独立客户端使用 `VITE_KUVIBE_API_URL`（含 `/api`；`.env.example` 给出本地 `http://localhost:7001/api`，未配置时回退到 `/api`），自动读取 Vben access store 中的 Bearer Token，并为 Refresh Token Cookie 开启 `withCredentials`。这是独立的 Axios 实例，不复用 Vben 的 `requestClient` 拦截器；HTTP 错误仍按 Axios 错误抛出，后端 `code !== 0` 抛出带有 `code` 和 `traceId` 的 `ApiBusinessError`。
 
 ```ts
-import type { AxiosResponse } from 'axios'
-import { client } from '#/client/client.gen'
-import { requestClient } from './request'
-
-type ApiOptions<F extends (...args: any[]) => Promise<any>> = Parameters<F>[0]
-
-type UnwrappedResponse<F extends (...args: any[]) => Promise<any>> =
-  ReturnType<F> extends Promise<infer R>
-    ? R extends { data: undefined, error: unknown }
-      ? never
-      : R extends AxiosResponse<infer Body>
-        ? Body extends { data?: infer Data } ? Data : Body
-        : R extends { data?: infer Data } ? Data : R
-    : never
-
-client.setConfig({
-  axios: requestClient.instance,
-  throwOnError: true,
-})
-
-export async function apiRequest<F extends (...args: any[]) => Promise<any>>(
-  apiMethod: F,
-  options: ApiOptions<F> = {} as ApiOptions<F>,
-): Promise<UnwrappedResponse<F>> {
-  const response = await apiMethod({ throwOnError: true, ...options })
-  return response as unknown as UnwrappedResponse<F>
-}
-```
-
-### 4. 调用生成接口
-
-生成函数名称由 Swagger `operationId` 决定，以实际生成结果为准：
-
-```ts
-import {
-  authCodes,
-  authLogin,
-  authRefresh,
-  userInfo,
-} from '#/client'
-import { apiRequest } from '#/api/api-client'
+import { apiRequest, authLogin, authRefresh, userInfo } from '#/services'
 
 const loginResult = await apiRequest(authLogin, {
   body: { username: 'admin', password: 'your-password' },
-  withCredentials: true,
 })
-accessStore.setAccessToken(loginResult.accessToken)
-
+const refreshed = await apiRequest(authRefresh)
 const currentUser = await apiRequest(userInfo)
-const accessCodes = await apiRequest(authCodes)
-console.log(userInfo.userId, userInfo.roles, accessCodes)
+console.log(loginResult.accessToken, refreshed.accessToken, currentUser.userId)
 ```
 
-刷新接口同样返回 `ResOp<{ accessToken }>`，不要为它创建“裸字符串”特例：
-
-```ts
-const result = await apiRequest(authRefresh, {
-  withCredentials: true,
-})
-accessStore.setAccessToken(result.accessToken)
-```
-
-登录、刷新和退出必须携带 `withCredentials: true`，否则浏览器不会接收或发送 HttpOnly Refresh Token Cookie。
+也可从 `#/services/generated/services/auth.gen` 等具体分组文件导入，减少浏览大型入口文件。生成类型以真实 Swagger 契约为准；每组请求类型与无 tag DTO 分别从 `types/`、`models/` 导入。原有 Vben 登录、刷新和页面 API 尚未迁移到新客户端，业务接入时按需替换，不要在生成目录手改函数。浏览器 Cookie 和 CORS 要求见下文。
 
 ## 基础配置
 
@@ -263,4 +159,4 @@ Playground 保留 `/table/list`、`/demo/bigint` 和 `/status`，只在 local/de
 
 ## 已验证的联调范围
 
-固定 v5.7.0 的浏览器验收、请求适配和可重复命令见[发布验收](../guide/release-verification.md)。仓库 `packages/frontend/playground` 的登录、用户列表及新增积分/充值/订单界面已接入真实后端，见[积分与充值前端](billing.md)。既有用户创建表单的 username/password/roleIds 等完整适配仍由接入方完成，本次不将全部演示页面作为已验收的管理功能。系统管理的 POST 创建接口和认证 POST 默认返回 HTTP 201，上传及时区保存显式返回 200；均遵循 ResOp，Swagger 与实际状态同步。
+固定 v5.7.0 的浏览器验收、请求适配和可重复命令见[发布验收](../guide/release-verification.md)。仓库 `packages/frontend/playground`  OpenAPI 生成客户端的登录、用户列表及新增积分/充值/订单界面已接入真实后端，见[积分与充值前端](billing.md)。既有用户创建表单的 username/password/roleIds 等完整适配仍由接入方完成，本次不将全部演示页面作为已验收的管理功能。系统管理的 POST 创建接口和认证 POST 默认返回 HTTP 201，上传及时区保存显式返回 200；均遵循 ResOp，Swagger 与实际状态同步。

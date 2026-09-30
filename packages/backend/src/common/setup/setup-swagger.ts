@@ -1,4 +1,6 @@
-import { INestApplication, Inject, Logger } from '@nestjs/common'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { INestApplication, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 
@@ -55,6 +57,13 @@ export function setupSwagger(
 
   })
 
+  // 与 HTTP 文档使用同一份契约；原子替换避免前端读取到写入一半的 JSON。
+  const outputPath = resolve('openapi/openapi.json')
+  mkdirSync(dirname(outputPath), { recursive: true })
+  const temporaryPath = `${outputPath}.${process.pid}.tmp`
+  writeFileSync(temporaryPath, `${JSON.stringify(document, null, 2)}\n`)
+  renameSync(temporaryPath, outputPath)
+
   SwaggerModule.setup(path, app, document, {
     swaggerOptions: {
       persistAuthorization: true, // 保持登录
@@ -67,5 +76,6 @@ export function setupSwagger(
     const logger = new Logger('SwaggerModule')
     logger.log(`Swagger UI: ${swaggerPath}`)
     logger.log(`Swagger JSON: ${swaggerPath}/json`)
+    logger.log(`OpenAPI artifact: ${outputPath}`)
   }
 }

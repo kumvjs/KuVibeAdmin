@@ -1,0 +1,27 @@
+{
+  "dataKeyId": "billing-v1",
+  "dataKeyFile": "data-key.base64",
+  "wechat": {
+    "enabled": false,
+    "merchantId": "REPLACE_WITH_MERCHANT_ID",
+    "appId": "REPLACE_WITH_APP_APPID",
+    "nativeAppId": "REPLACE_WITH_NATIVE_APPID",
+    "certificateSerial": "REPLACE_WITH_MERCHANT_CERT_SERIAL",
+    "privateKeyFile": "wechat-private-key.pem",
+    "apiV3KeyFile": "wechat-api-v3-key.txt",
+    "platformKeys": { "REPLACE_WITH_WECHAT_PUBLIC_KEY_ID": "wechat-public-key.pem" },
+    "notifyUrl": "https://your-api.example/api/payments/wechat/notify"
+  },
+  "alipay": {
+    "enabled": false,
+    "appId": "REPLACE_WITH_APP_ID",
+    "sellerId": "REPLACE_WITH_SELLER_ID",
+    "environment": "sandbox",
+    "keyType": "PKCS8",
+    "privateKeyFile": "alipay-private-key.pem",
+    "publicKeyFile": "alipay-public-key.pem",
+    "notifyUrl": "https://your-api.example/api/payments/alipay/notify"
+  },
+  "apple": [],
+  "google": []
+}

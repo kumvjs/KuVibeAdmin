@@ -7,7 +7,6 @@ import {
   NestInterceptor,
 } from '@nestjs/common'
 import { Observable, tap } from 'rxjs'
-import { isProd } from '#/config/index.js'
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -22,11 +21,13 @@ export class LoggingInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse<FastifyReply>()
 
     const isSse = request.headers.accept === 'text/event-stream'
+    const sensitive = /\/(?:recharge|payments|system\/billing)(?:\/|\?|$)/.test(request.url)
+    const loggedUrl = sensitive ? request.url.split('?')[0] : request.url
     this.logger.debug({
       type: 'request',
       method: request.method,
-      url: request.url,
-      body: request.body,
+      url: loggedUrl,
+      body: sensitive ? '[billing redacted]' : request.body,
     })
     const now = Date.now()
 
@@ -37,8 +38,8 @@ export class LoggingInterceptor implements NestInterceptor {
         this.logger.debug({
           type: 'response',
           method: request.method,
-          url: request.url,
-          data,
+          url: loggedUrl,
+          data: sensitive ? '[billing redacted]' : data,
           cost: `${Date.now() - now}ms`,
         })
       },

@@ -1,5 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger } from '@nestjs/common'
+import { PaymentsService } from '../payments/payments.service.js'
 import { OrdersService } from './orders.service.js'
 import { BillingOutboxService } from './outbox.service.js'
 
@@ -9,7 +10,7 @@ export class BillingWorker implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>
   private active = false
 
-  constructor(private readonly outbox: BillingOutboxService, private readonly orders: OrdersService) {}
+  constructor(private readonly outbox: BillingOutboxService, private readonly orders: OrdersService, private readonly payments: PaymentsService) {}
 
   onModuleInit() {
     if (process.env.BILLING_WORKER_ENABLED === 'false')
@@ -30,14 +31,22 @@ export class BillingWorker implements OnModuleInit, OnModuleDestroy {
       return
     this.active = true
     try {
-      // 后续渠道handler注册后扩展；不能领取尚未实现的网络任务并伪造成功。
-      for (const lease of await this.outbox.claim(['order_expire'], 5, 60)) {
+      for (const lease of await this.outbox.claim(['order_expire', 'payment_prepare', 'payment_poll', 'payment_inbox', 'order_close'], 5, 120)) {
         try {
-          await this.orders.expire(lease.aggregateId)
+          if (lease.type === 'order_expire')
+            await this.orders.expire(lease.aggregateId)
+          else if (lease.type === 'payment_prepare')
+            await this.payments.processPrepare(lease.aggregateId)
+          else if (lease.type === 'payment_poll')
+            await this.payments.poll(lease.aggregateId)
+          else if (lease.type === 'payment_inbox')
+            await this.payments.processInbox(lease.aggregateId)
+          else
+            await this.payments.close(lease.aggregateId)
           await this.outbox.complete(lease)
         }
         catch {
-          await this.outbox.fail(lease, 'order_expire_failed')
+          await this.outbox.fail(lease, `${lease.type}_failed`)
         }
       }
     }

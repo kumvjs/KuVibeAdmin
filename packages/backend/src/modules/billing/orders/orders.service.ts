@@ -9,7 +9,7 @@ import { CatalogService } from '../catalog/catalog.service.js'
 import { calculateQuote, PAYMENT_CHANNELS } from '../catalog/catalog.types.js'
 import { ChannelProductEntity } from '../catalog/entities/channel-product.entity.js'
 import { CouponEntity } from '../catalog/entities/promotion.entity.js'
-import { RechargeUserDayEntity, RechargeUserStateEntity } from '../catalog/entities/recharge-user-state.entity.js'
+import { RechargeUserStateEntity } from '../catalog/entities/recharge-user-state.entity.js'
 import { QuotaService } from '../catalog/quota.service.js'
 import { PG_BIGINT_MAX, positiveInteger } from '../points/points.types.js'
 import { billingTransaction } from '../shared/billing-transaction.js'
@@ -45,8 +45,8 @@ export class OrdersService {
       const lockedPromotions: { id: string }[] = await manager.query(`SELECT id::text FROM biz_promotion WHERE tenant_id=1 ORDER BY id FOR SHARE`)
       const [{ now }] = await manager.query('SELECT NOW() AS now')
       const date = getBusinessDate('Asia/Shanghai', now)
-      const day = await manager.getRepository(RechargeUserDayEntity).findOneBy({ tenantId: '1', userId, businessDate: date })
-      const candidates = await this.catalog.applicablePromotions(manager, command.packageId, command, userId, now, !state.firstOrderId, !day?.firstOrderId, lockedPromotions.map(item => item.id))
+      // 首单赠分候选保留到结算再判定，避免跨午夜或内购延迟沿用下单事实。
+      const candidates = await this.catalog.applicablePromotions(manager, command.packageId, command, userId, now, true, true, lockedPromotions.map(item => item.id))
       const always = candidates.filter(item => item.rules.eligibility === 'always')
       const calculated = calculateQuote(version.priceMinor, version.basePoints, always)
       if (BigInt(version.basePoints) + BigInt(version.giftPoints) + BigInt(calculateQuote(version.priceMinor, version.basePoints, candidates).bonusPoints) > PG_BIGINT_MAX)

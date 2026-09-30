@@ -38,6 +38,8 @@ x-backend: &backend
     JWT_EXPIRE: '86400'
     REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?请运行 node scripts/docker-init.mjs 或配置 REFRESH_TOKEN_SECRET}
     REFRESH_TOKEN_EXPIRE: '2592000'
+    BILLING_CONFIG_FILE: ${BILLING_CONFIG_FILE:-}
+    BILLING_WORKER_ENABLED: ${BILLING_WORKER_ENABLED:-true}
   depends_on:
     postgres:
       condition: service_healthy
@@ -53,6 +55,7 @@ services:
     volumes:
       - attachments:/app/var/attachments
       - public:/app/public
+      - ./.secrets/billing:/app/secrets/billing:ro
     stop_grace_period: 30s
 
   postgres:

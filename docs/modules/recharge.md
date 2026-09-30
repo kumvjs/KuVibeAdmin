@@ -1,6 +1,6 @@
 # 充值套餐与优惠
 
-当前已实现积分账户、套餐运营、订单创建/查询/取消与后台超时补偿。四渠道支付与验真仍按开发计划推进，不能使用报价或pending订单作为支付/到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
+当前已实现积分账户、套餐运营、订单创建/查询/取消、微信App/Native扫码与支付宝App/扫码适配及统一入账。渠道默认关闭，尚未完成商户沙箱联调；Apple/Google验真继续开发。不能使用报价、客户端支付结果或pending订单作为到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
 
 ## 套餐与版本
 
@@ -32,11 +32,23 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 
 订单、不可变价格/权益/优惠快照、持久预占凭证、审计事件及outbox在一个事务提交。本人只能读取/取消本人订单；管理查看使用独立订单权限。微信/支付宝每位用户只保留一笔未结束订单，避免反复下单占光优惠和库存；内购不采用此现金订单限制。
 
-未向渠道发起请求的现金订单可以本地关单并一次性释放预占。已发起支付的取消或15分钟到期订单进入`closing`，必须先查单和确认渠道关单，不能仅依赖时间到期释放库存。内购不存在统一15分钟过期，不提供站内取消接口。当前支付适配尚未启用，不会直接创建支付凭证或发放充值积分。
+未向渠道发起请求的现金订单可以本地关单并一次性释放预占。已发起支付的取消或15分钟到期订单进入`closing`，必须先查单和确认渠道关单，不能仅依赖时间到期释放库存。网络失败、渠道查单“交易不存在”或未确认关单均视为未知，保留预占。内购不存在统一15分钟过期，不提供站内取消接口。
 
-后台worker每5秒领取到期任务，数据库使用`FOR UPDATE SKIP LOCKED`和60秒租约，可由多个后端实例同时运行。崩溃后租约过期重新领取；每次租约令牌不同，旧worker不能完成新租约。失败指数退避至最多300秒，10次后保留`dead`记录供后续运维处理。业务处理须保持幂等，因为外部网络效果与数据库提交不能保证一起发生。
+后台worker每5秒领取任务，数据库使用`FOR UPDATE SKIP LOCKED`和120秒租约，可由多个后端实例同时运行。崩溃后租约过期重新领取；每次租约令牌不同，旧worker不能完成新租约。失败指数退避至最多300秒，10次后保留`dead`记录供运维处理。业务处理须保持幂等，因为外部网络效果与数据库提交不能保证一起发生。
 
-设置`BILLING_WORKER_ENABLED=false`可停用当前实例的后台任务。渠道关单等未注册handler的任务不会被当作成功处理；实际接入后才能完成此类任务。运营前检查长期`closing`、`dead`和预占余额，不使用手工改快照/删流水绕过补偿。
+设置`BILLING_WORKER_ENABLED=false`可停用当前实例的后台任务。运营前检查长期`closing`、`dead`、通知`review`和预占余额，不使用手工改快照/删流水绕过补偿。
+
+## 微信与支付宝接入
+
+复制`docker/billing.example.json`到忽略的`.secrets/billing/config.json`，填写商户身份、密钥/公钥文件与HTTPS回调地址。所有文件路径相对于配置文件；密钥只放在`.secrets/billing/`，Compose以只读方式挂载到`/app/secrets/billing`。在对应环境文件设置`BILLING_CONFIG_FILE=/app/secrets/billing/config.json`，检查配置后将需要的渠道`enabled`设为`true`并重建容器。默认没有配置，支付准备返回503，不会伪造支付成功。当前私钥模式不包含支付宝应用证书模式，微信需手动维护可信支付公钥ID/证书及轮换重叠窗口。
+
+用户下单后调用支付准备接口，`queued/starting`时稍后用同一订单重试，`ready`时读取扫码URL或App SDK参数。准备任务在网络请求前持久化“已发起支付”事实；超时按相同商户订单号重试。客户端回报成功仅用来促使查询，不作为发积分的依据。
+
+微信对原始请求体做RSA-SHA256验签、可信公钥ID和五分钟时间窗口检查，再AES-GCM解密；支付宝使用官方SDK的RSA2通知验签及应答验签。回调验证后先写不可变通知记录和outbox，再分别返回微信204或支付宝纯文本`success`。通知/支付参数/券码不会出现在请求响应日志中。
+
+结算重新校验商户、应用、环境、订单、金额、币种及数量，交易标识唯一且一笔订单只能关联一笔交易。预占核销、基础/赠送积分流水、用户累计/当日首单和支付状态原子提交。首单赠分按入账时判定；活动预算不足不影响基础权益，原保证赠分仍兑现。已关闭订单的迟到款保留待审，不利用已释放库存继续履约。退款扣回和自动对账尚在后续阶段，不把待审记录写为已处理。
+
+实现依据：[微信App下单](https://pay.wechatpay.cn/doc/v3/merchant/4013070347)、[微信Native下单](https://pay.wechatpay.cn/doc/v3/merchant/4012791877)、[支付宝官方Node SDK](https://github.com/alipay/alipay-sdk-nodejs-all)。上线前仍须完成真实商户权限、回调地址和客户端联调。
 
 ## 开发验证
 
@@ -47,6 +59,7 @@ node scripts/docker-dev.mjs exec postgres createdb -U ku_vibe_admin kuvibe_billi
 node scripts/docker-dev.mjs exec postgres createdb -U ku_vibe_admin kuvibe_billing_test_migration
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/catalog.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/orders.integration.mjs
+node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/payments.integration.mjs
 ```
 
 已创建测试库时跳过createdb；按实际`POSTGRES_USER`替换示例用户名。测试保留本次独立业务记录，使用随机业务标识避免跨次互相干扰。覆盖200并发抢每日20份、预算回滚与消费/释放、版本降额保护、券固定权益、内购映射、首单事实保护及迁移往返/旧数据保留/实体diff。并发测试验证一致性，不代表生产吞吐已验收。

@@ -9,6 +9,19 @@ export interface ReservedQuota { bucketId: string, amount: string }
 
 @Injectable()
 export class QuotaService {
+  /** 结算同时释放旧活动和预占新活动，须先按统一顺序锁住二者。 */
+  async lockForSettlement(manager: EntityManager, demands: QuotaDemand[], reservations: ReservedQuota[]) {
+    const repository = manager.getRepository(QuotaBucketEntity)
+    const existing = reservations.length ? await repository.createQueryBuilder('bucket').where('bucket.id IN (:...ids)', { ids: reservations.map(item => item.bucketId) }).getMany() : []
+    if (existing.length !== reservations.length)
+      throw new Error('结算额度凭证资源缺失')
+    const resources = new Map([...existing.map(item => ({ resourceKey: item.resourceKey, periodKey: item.periodKey, limit: item.limit })), ...demands].map(item => [`${item.resourceKey}/${item.periodKey}`, item]))
+    for (const [, resource] of [...resources.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      await repository.createQueryBuilder().insert().values({ resourceKey: resource.resourceKey, periodKey: resource.periodKey, limit: resource.limit, reserved: '0', sold: '0' }).orIgnore().execute()
+      await repository.createQueryBuilder('bucket').where('bucket.tenantId=1 AND bucket.resourceKey=:key AND bucket.periodKey=:period', { key: resource.resourceKey, period: resource.periodKey }).setLock('pessimistic_write').getOneOrFail()
+    }
+  }
+
   /** 调用方必须先锁住稳定套餐/活动配置，预占和订单记录使用同一事务。 */
   async reserve(manager: EntityManager, demands: QuotaDemand[]): Promise<(ReservedQuota & { resourceKey: string })[]> {
     if (!manager.queryRunner?.isTransactionActive)

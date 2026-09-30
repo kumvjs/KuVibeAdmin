@@ -21,6 +21,7 @@ const app = await NestFactory.create<NestFastifyApplication>(
   {
     bufferLogs: false,
     snapshot: true,
+    rawBody: true,
     // forceCloseConnections: true,
   },
 )

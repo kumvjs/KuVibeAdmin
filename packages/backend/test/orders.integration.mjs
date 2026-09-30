@@ -172,7 +172,18 @@ test('停用用户超时补偿仍执行；已发起支付只能进入关单确�
   await source.getRepository(SysUserEntity).softDelete(buyer.id)
   await source.query('UPDATE biz_recharge_order SET payment_initiated=true WHERE id=$1', [initiatedOrder.id])
   await source.query(`UPDATE biz_billing_outbox SET available_at=NOW() WHERE type='order_expire' AND aggregate_id=ANY($1)`, [[order.id, initiatedOrder.id]])
-  await new BillingWorker(outbox, orders).tick()
+  // 专用测试库保留旧记录；只领取本阶段到期任务并排空积压，避免新支付任务占用批次。
+  const expiryOutbox = {
+    claim: () => outbox.claim(['order_expire'], 100),
+    complete: lease => outbox.complete(lease),
+    fail: (lease, reason) => outbox.fail(lease, reason),
+  }
+  const worker = new BillingWorker(expiryOutbox, orders, undefined)
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await worker.tick()
+    if ((await orders.get(buyer.id, order.id)).status === 'closed' && (await orders.get(initiatedBuyer.id, initiatedOrder.id)).status === 'closing')
+      break
+  }
   assert.equal((await orders.get(buyer.id, order.id)).status, 'closed')
   assert.equal((await orders.get(initiatedBuyer.id, initiatedOrder.id)).status, 'closing')
   assert.equal((await source.query('SELECT reserved::text FROM biz_quota_bucket WHERE resource_key=$1', [`package:${row.id}:total`]))[0].reserved, '1')

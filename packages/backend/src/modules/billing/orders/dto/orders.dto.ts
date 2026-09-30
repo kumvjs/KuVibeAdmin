@@ -44,6 +44,14 @@ export class OrderCreateDto {
 
 export class OrderListQueryDto extends PointLedgerQueryDto {}
 
+export class OrderSettlementDto {
+  @ApiProperty({ type: String }) paidLedgerId: string
+  @ApiProperty({ type: String, nullable: true }) giftLedgerId: string | null
+  @ApiProperty({ description: '原实际发放基础积分，退款后仍保留历史值' }) basePoints: string
+  @ApiProperty({ description: '原实际发放赠分合计，已包含活动赠分' }) giftPoints: string
+  @ApiProperty({ description: '已包含在giftPoints中的实际活动赠分，不能再次相加' }) bonusPoints: string
+}
+
 export class OrderResponseDto {
   @ApiProperty({ type: String })
   id: string
@@ -86,6 +94,9 @@ export class OrderResponseDto {
 
   @ApiProperty({ type: String })
   guaranteedBonusPoints: string
+
+  @ApiProperty({ type: OrderSettlementDto, nullable: true, description: '已入账不可变权益及流水；尚未入账为null' })
+  settlement: OrderSettlementDto | null
 
   @ApiProperty({ type: String, nullable: true })
   productId: string | null

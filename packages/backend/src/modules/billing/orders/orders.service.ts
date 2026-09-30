@@ -32,7 +32,7 @@ export class OrdersService {
       if (existing) {
         if (existing.requestHash !== hash)
           throw new ConflictException('订单幂等键已用于不同请求')
-        return this.result(existing)
+        return this.result(existing, (await this.credits([existing], manager)).get(existing.id))
       }
       const iap = ['apple', 'google'].includes(command.channel)
       if (!iap && state.currentOrderId)
@@ -138,7 +138,7 @@ export class OrdersService {
     const row = await this.source.getRepository(RechargeOrderEntity).findOneBy({ id, tenantId: '1', ...(admin ? {} : { userId }) })
     if (!row)
       throw new NotFoundException('订单不存在')
-    return this.result(row)
+    return this.result(row, (await this.credits([row])).get(row.id))
   }
 
   async list(userId: string, cursor?: string, limit = 20) {
@@ -150,7 +150,9 @@ export class OrdersService {
     if (cursor)
       builder.andWhere('order.id < :cursor', { cursor })
     const rows = await builder.orderBy('order.id', 'DESC').take(limit + 1).getMany()
-    return { items: rows.slice(0, limit).map(row => this.result(row)), nextCursor: rows.length > limit ? rows[limit - 1].id : null }
+    const page = rows.slice(0, limit)
+    const credits = await this.credits(page)
+    return { items: page.map(row => this.result(row, credits.get(row.id))), nextCursor: rows.length > limit ? rows[limit - 1].id : null }
   }
 
   async cancel(userId: string, id: string) {
@@ -232,7 +234,15 @@ export class OrdersService {
     await manager.getRepository(OrderEventEntity).insert({ orderId, type, actorId, reason })
   }
 
-  result(order: RechargeOrderEntity) {
+  private async credits(rows: RechargeOrderEntity[], manager = this.source.manager) {
+    const ids = rows.filter(row => row.paidLedgerId).map(row => row.id)
+    if (!ids.length)
+      return new Map<string, { paidLedgerId: string, giftLedgerId: string | null, basePoints: string, giftPoints: string, bonusPoints: string }>()
+    const records: { orderId: string, paidLedgerId: string, giftLedgerId: string | null, basePoints: string, giftPoints: string, bonusPoints: string }[] = await manager.query(`SELECT o.id::text AS "orderId",o.paid_ledger_id::text AS "paidLedgerId",o.gift_ledger_id::text AS "giftLedgerId",p.amount::text AS "basePoints",COALESCE(g.amount,0)::text AS "giftPoints",t.bonus_points::text AS "bonusPoints" FROM biz_recharge_order o JOIN biz_point_ledger p ON p.id=o.paid_ledger_id LEFT JOIN biz_point_ledger g ON g.id=o.gift_ledger_id JOIN biz_payment_transaction t ON t.order_id=o.id WHERE o.id=ANY($1::bigint[])`, [ids])
+    return new Map(records.map(({ orderId, ...credit }) => [orderId, credit]))
+  }
+
+  result(order: RechargeOrderEntity, settlement: { paidLedgerId: string, giftLedgerId: string | null, basePoints: string, giftPoints: string, bonusPoints: string } | null = null) {
     return {
       id: order.id,
       merchantNo: order.merchantNo,
@@ -248,6 +258,7 @@ export class OrdersService {
       basePoints: order.snapshot.basePoints,
       giftPoints: order.snapshot.giftPoints,
       guaranteedBonusPoints: order.snapshot.guaranteedBonusPoints,
+      settlement,
       productId: order.snapshot.productId,
       channelProductId: order.snapshot.channelProductId,
       createdAt: order.createdAt.toISOString(),

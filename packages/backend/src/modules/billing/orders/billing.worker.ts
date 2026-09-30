@@ -60,7 +60,7 @@ export class BillingWorker implements OnModuleInit, OnModuleDestroy {
           else if (lease.type === 'reconcile') {
             if (!this.reconcile)
               throw new Error('对账处理器未配置')
-            await this.reconcile.process(lease.aggregateId)
+            await this.reconcile.process(lease.aggregateId, lease.payload.repairProjection === 'true')
           }
           else {
             await this.payments.close(lease.aggregateId)

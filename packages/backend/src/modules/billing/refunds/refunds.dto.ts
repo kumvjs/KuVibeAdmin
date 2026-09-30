@@ -19,6 +19,11 @@ export class ReconcileRequestDto extends RefundRequestDto {
   @IsOptional()
   @IsBoolean()
   verifyChannel?: boolean
+
+  @ApiPropertyOptional({ description: '显式按完整流水、批次和冻结证据重建错误账户投影；证据不一致则拒绝修复，默认false', default: false })
+  @IsOptional()
+  @IsBoolean()
+  repairProjection?: boolean
 }
 
 export class RiskResolveDto {

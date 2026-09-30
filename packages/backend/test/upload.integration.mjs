@@ -316,7 +316,8 @@ try {
   await check('cleanup preserves bound attachments, and bigint FK/unique constraints execute', async () => {
     await service.cleanup()
     assert.equal((await attachments.findOneByOrFail({ id: avatarId })).status, 'ready')
-    await assert.rejects(source.query(`DELETE FROM "${schema}".sys_attachment WHERE id=$1`, [avatarId]), error => error.code === '23503')
+    // PG18的RESTRICT返回23001；同时核对约束所属引用表，不能放宽为任意数据库错误。
+    await assert.rejects(source.query(`DELETE FROM "${schema}".sys_attachment WHERE id=$1`, [avatarId]), error => ['23503', '23001'].includes(error.code) && error.driverError?.table === 'sys_attachment_reference')
     const ref = await references.findOneByOrFail({ attachmentId: avatarId })
     await assert.rejects(references.insert({ attachmentId: avatarId, businessType: ref.businessType, businessId: ref.businessId, field: ref.field }), error => error.code === '23505')
     await assert.rejects(source.query(`UPDATE "${schema}".sys_upload_policy SET max_file_bytes=-1 WHERE purpose='attachment'`), error => error.code === '23514')

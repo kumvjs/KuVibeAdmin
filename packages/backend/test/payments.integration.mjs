@@ -101,7 +101,8 @@ test('默认未配置渠道不可发起支付，不写尝试/任务、不改变�
 test('100次并发同一真实结算事务只发一份权益、两条流水和一次首单/库存核销', async () => {
   const buyer = await user()
   const pkg = await pack({ dailyLimit: '1' })
-  const row = await order(buyer, pkg)
+  const command = { packageId: pkg.id, versionId: pkg.versionId, channel: 'wechat', client: 'qr', idempotencyKey: randomUUID(), payableMinor: pkg.priceMinor }
+  const row = await orders.create(buyer.id, command)
   const prepared = await Promise.all(Array.from({ length: 30 }, () => payments.prepare(buyer.id, row.id)))
   assert.ok(prepared.every(result => result.status === 'queued'))
   assert.equal((await source.query(`SELECT count(*)::int AS n FROM biz_billing_outbox WHERE type='payment_prepare' AND aggregate_id=$1`, [row.id]))[0].n, 1)
@@ -113,6 +114,12 @@ test('100次并发同一真实结算事务只发一份权益、两条流水和�
   const results = await Promise.all(Array.from({ length: 100 }, () => payments.processInbox(accepted[0].inboxId)))
   assert.equal(results.length, 100)
   assert.equal((await points.account(buyer.id)).available, '1100')
+  const credited = await orders.get(buyer.id, row.id)
+  assert.equal(credited.settlement.basePoints, '1000')
+  assert.equal(credited.settlement.giftPoints, '100')
+  assert.equal(credited.settlement.bonusPoints, '0')
+  assert.deepEqual((await orders.create(buyer.id, command)).settlement, credited.settlement)
+  assert.deepEqual((await orders.list(buyer.id)).items[0].settlement, credited.settlement)
   const [state] = await source.query('SELECT first_order_id::text,settlement_sequence::text,current_order_id FROM biz_recharge_user_state WHERE user_id=$1', [buyer.id])
   assert.deepEqual(state, { first_order_id: row.id, settlement_sequence: '1', current_order_id: null })
   assert.equal((await source.query(`SELECT count(*)::int AS n FROM biz_point_ledger l JOIN biz_point_account a ON l.account_id=a.id WHERE a.user_id=$1`, [buyer.id]))[0].n, 2)

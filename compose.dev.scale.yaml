@@ -1,0 +1,39 @@
+# 仅开发验收：两个API与一个worker连接独立账务测试库；主开发服务保持运行。
+x-billing-scale: &billing-scale
+  extends:
+    file: compose.yaml
+    service: backend
+  profiles: [billing-scale]
+  image: kuvibe-admin-backend:dev
+  build:
+    target: development
+  command: ['pnpm', 'start:dev']
+  volumes:
+    - ./packages/backend/src:/app/src:ro
+    - ./packages/backend/types:/app/types:ro
+    - ./packages/backend/test:/app/test:ro
+    - ./packages/backend/tsconfig.json:/app/tsconfig.json:ro
+    - ./packages/backend/tsconfig.build.json:/app/tsconfig.build.json:ro
+    - ./packages/backend/tsconfig.spec.json:/app/tsconfig.spec.json:ro
+  environment: &billing-scale-env
+    NODE_ENV: development
+    TYPEORM_DATABASE: kuvibe_billing_scale
+    REDIS_DB: '5'
+    BILLING_WORKER_ENABLED: 'false'
+    BILLING_CONFIG_FILE: ''
+
+services:
+  billing-api-1:
+    <<: *billing-scale
+    ports: !override
+      - '127.0.0.1:17002:7001'
+  billing-api-2:
+    <<: *billing-scale
+    ports: !override
+      - '127.0.0.1:17003:7001'
+  billing-worker:
+    <<: *billing-scale
+    environment:
+      <<: *billing-scale-env
+      BILLING_WORKER_ENABLED: 'true'
+    ports: !reset []

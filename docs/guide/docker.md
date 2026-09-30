@@ -56,6 +56,8 @@ node scripts/docker-dev.mjs down
 
 Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要在开发过程中删除数据卷。修改实体不会自动建表，迁移仍显式审查/执行。专用积分测试库与开发库分开，测试不能清理开发用户/账本。
 
+两个API与独立worker的账务并发验证、Linux兼容回归和恢复操作见[账务运维与开发验收](../modules/billing-operations.md)。
+
 覆盖文件的合并方式参见[Docker Compose文档](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/)，只读源码挂载参见[bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)。
 
 | 配置 | 默认值 / 行为 |

@@ -181,8 +181,16 @@ test('幂等对账核对账本、批次、冻结、订单、额度；明确未�
   assert.ok(bad.findings.some(item => item.code === 'account_ledger_available'))
   assert.equal((await points.account(fixture.buyer.id)).available, '1101')
   assert.equal((await points.account(fixture.buyer.id)).status, 'blocked')
-  // 恢复测试故障注入值；生产只能通过审计领域命令或备份恢复。
-  await source.query(`UPDATE biz_point_account SET available=available-1 WHERE user_id=$1`, [fixture.buyer.id])
+  const repairCommand = { ...command(), verifyChannel: false, repairProjection: true }
+  const repair = await reconciliation.request(fixture.order.id, repairCommand, actor.id)
+  await reconciliation.process(repair.id, true)
+  await reconciliation.process(repair.id, true)
+  assert.equal((await points.account(fixture.buyer.id)).available, '1100')
+  assert.equal((await points.account(fixture.buyer.id)).status, 'blocked', '修复不能擅自解除已有风险')
+  const [fixed] = await reconciliation.list(fixture.order.id)
+  assert.equal(fixed.status, 'done')
+  assert.ok(fixed.findings.some(item => item.code === 'projection_rebuilt'))
+  await assert.rejects(reconciliation.request(fixture.order.id, { ...repairCommand, repairProjection: false }, actor.id), /幂等键/)
 })
 
 test('M5迁移保留历史已付订单/首单/积分，空表往返、非空拒绝down、实体diff为空、审计防篡改', async () => {
@@ -252,4 +260,23 @@ test('渠道查证失败不会标记对账完成；仅恢复本订单死信，�
   finally { provider.query = original }
   assert.equal((await reconciliation.list(fixture.order.id))[0].status, 'done')
   assert.equal((await points.account(fixture.buyer.id)).available, '1100')
+})
+
+test('批次分配证据不一致时拒绝投影修复，不伪造流水或增加余额', async () => {
+  const fixture = await paid()
+  const [lot] = await source.query(`SELECT l.id::text FROM biz_point_lot l JOIN biz_recharge_order o ON l.grant_id=o.paid_ledger_id WHERE o.id=$1`, [fixture.order.id])
+  await source.query('UPDATE biz_point_lot SET available=available-1 WHERE id=$1', [lot.id])
+  try {
+    const job = await reconciliation.request(fixture.order.id, { ...command(), verifyChannel: false, repairProjection: true }, actor.id)
+    await reconciliation.process(job.id, true)
+    const [result] = await reconciliation.list(fixture.order.id)
+    assert.equal(result.status, 'review')
+    assert.ok(result.findings.some(item => item.code === 'lot_allocation_replay'))
+    assert.ok(!result.findings.some(item => item.code === 'projection_rebuilt'))
+    assert.equal((await points.account(fixture.buyer.id)).available, '1100')
+  }
+  finally {
+    // 仅恢复本测试故障注入的来源投影；产品修复不允许无凭据修改批次。
+    await source.query('UPDATE biz_point_lot SET available=available+1 WHERE id=$1', [lot.id])
+  }
 })

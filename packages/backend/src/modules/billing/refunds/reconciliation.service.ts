@@ -21,12 +21,13 @@ import { RefundsService } from './refunds.service.js'
 export class ReconciliationService {
   constructor(private readonly source: DataSource, private readonly orders: OrdersService, private readonly outbox: BillingOutboxService, private readonly payments: PaymentsService, private readonly refunds: RefundsService) {}
 
-  async request(orderId: string, command: RefundCommand & { verifyChannel?: boolean }, actorId: string) {
+  async request(orderId: string, command: RefundCommand & { verifyChannel?: boolean, repairProjection?: boolean }, actorId: string) {
     positiveInteger(orderId, 'orderId')
     if (!/^[\w:.-]{1,120}$/.test(command.idempotencyKey) || !command.reason?.trim() || command.reason.length > 500)
       throw new ConflictException('对账须提供幂等键和人工原因')
     const verifyChannel = command.verifyChannel !== false
-    const hash = createHash('sha256').update(JSON.stringify({ key: command.idempotencyKey, reason: command.reason, verifyChannel, actorId })).digest('hex')
+    const repairProjection = command.repairProjection === true
+    const hash = createHash('sha256').update(JSON.stringify({ key: command.idempotencyKey, reason: command.reason, verifyChannel, actorId, ...(repairProjection ? { repairProjection: true } : {}) })).digest('hex')
     const hint = await this.source.getRepository(RechargeOrderEntity).findOneByOrFail({ id: orderId })
     return billingTransaction(this.source, async (manager) => {
       await manager.getRepository(SysUserEntity).findOneOrFail({ where: { id: hint.userId }, withDeleted: true, lock: { mode: 'pessimistic_read' } })
@@ -44,7 +45,7 @@ export class ReconciliationService {
       const inboxes = await manager.query('SELECT id::text FROM biz_payment_inbox WHERE order_id=$1 AND status=\'pending\'', [orderId])
       const refunds = await manager.query('SELECT id::text FROM biz_recharge_refund WHERE order_id=$1 AND status IN (\'held\',\'processing\')', [orderId])
       await manager.getRepository(BillingOutboxEntity).createQueryBuilder().update().set({ status: 'pending', attempts: 0, availableAt: () => 'NOW()', lastError: null }).where(`status='dead' AND ((type IN ('order_expire','payment_prepare','payment_poll','order_close') AND aggregate_id=:orderId) OR (type IN ('payment_inbox','google_consume') AND aggregate_id=ANY(:inboxes)) OR (type='refund_execute' AND aggregate_id=ANY(:refunds)))`, { orderId, inboxes: inboxes.map((item: { id: string }) => item.id), refunds: refunds.map((item: { id: string }) => item.id) }).execute()
-      await this.outbox.enqueue(manager, 'reconcile', row.id, `reconcile:${row.id}`)
+      await this.outbox.enqueue(manager, 'reconcile', row.id, `reconcile:${row.id}`, undefined, { repairProjection: String(repairProjection) })
       await this.orders.event(manager, orderId, 'reconcile_requested', actorId, command.reason)
       return row
     })
@@ -55,7 +56,7 @@ export class ReconciliationService {
     return this.source.getRepository(ReconciliationEntity).find({ where: { orderId }, order: { id: 'DESC' }, take: 100 })
   }
 
-  async process(id: string) {
+  async process(id: string, repairProjection = false) {
     const job = await this.source.getRepository(ReconciliationEntity).findOneByOrFail({ id })
     if (job.status !== 'pending')
       return
@@ -82,6 +83,7 @@ export class ReconciliationService {
         buckets.push(await manager.getRepository(QuotaBucketEntity).findOneOrFail({ where: { id: bucketId }, lock: { mode: 'pessimistic_write' } }))
       const account = await manager.getRepository(PointAccountEntity).findOne({ where: { userId: order.userId }, lock: { mode: 'pessimistic_write' } })
       const findings: NonNullable<ReconciliationEntity['findings']> = []
+      let projection: { available: string, frozen: string, sequence: string } | null = null
       const compare = (code: string, expected: string, actual: string) => {
         if (expected !== actual)
           findings.push({ code, expected, actual })
@@ -89,7 +91,8 @@ export class ReconciliationService {
       if (!job.verifyChannel)
         findings.push({ code: 'channel_not_checked' })
       if (account) {
-        const [ledger] = await manager.query('SELECT COALESCE(SUM(available_delta),0)::text AS available,COALESCE(SUM(frozen_delta),0)::text AS frozen,COUNT(*)::text AS sequence FROM biz_point_ledger WHERE account_id=$1', [account.id])
+        const [ledger] = await manager.query('SELECT COALESCE(SUM(available_delta),0)::text AS available,COALESCE(SUM(frozen_delta),0)::text AS frozen,COUNT(*)::text AS sequence,COALESCE(MAX(sequence),0)::text AS max_sequence FROM biz_point_ledger WHERE account_id=$1', [account.id])
+        compare('ledger_sequence_continuity', ledger.sequence, ledger.max_sequence)
         compare('account_ledger_available', ledger.available, account.available)
         compare('account_ledger_frozen', ledger.frozen, account.frozen)
         compare('account_ledger_sequence', ledger.sequence, account.sequence)
@@ -98,6 +101,8 @@ export class ReconciliationService {
         compare('account_lots_frozen', lots.frozen, account.frozen)
         const [holds] = await manager.query('SELECT COALESCE(SUM(remaining),0)::text AS frozen FROM biz_point_hold WHERE account_id=$1', [account.id])
         compare('account_holds_frozen', holds.frozen, account.frozen)
+        if (ledger.available === lots.available && ledger.frozen === lots.frozen && ledger.frozen === holds.frozen && ledger.sequence === ledger.max_sequence)
+          projection = { available: ledger.available, frozen: ledger.frozen, sequence: ledger.sequence }
         const [detail] = await manager.query(`SELECT COUNT(*)::text AS count FROM biz_point_hold h LEFT JOIN LATERAL (SELECT COALESCE(SUM(remaining),0) AS amount FROM biz_point_hold_item WHERE hold_id=h.id) i ON true WHERE h.account_id=$1 AND h.remaining<>i.amount`, [account.id])
         compare('hold_details', '0', detail.count)
         const [alloc] = await manager.query(`SELECT COUNT(*)::text AS count FROM biz_point_ledger l LEFT JOIN LATERAL (SELECT COALESCE(SUM(amount),0) AS amount FROM biz_point_allocation WHERE ledger_id=l.id) a ON true WHERE l.account_id=$1 AND l.amount<>a.amount`, [account.id])
@@ -133,10 +138,17 @@ export class ReconciliationService {
         compare(`quota_sold_${bucket.id}`, sum.sold, bucket.sold)
       }
       const differences = findings.filter(item => item.code !== 'channel_not_checked')
-      if (differences.length)
+      const projectionCodes = new Set(['account_ledger_available', 'account_ledger_frozen', 'account_ledger_sequence', 'account_lots_available', 'account_lots_frozen', 'account_holds_frozen'])
+      const repaired = repairProjection && account && projection && differences.length > 0 && differences.every(item => projectionCodes.has(item.code))
+      if (repaired && account && projection) {
+        await manager.getRepository(PointAccountEntity).update(account.id, projection)
+        findings.push({ code: 'projection_rebuilt', expected: `${projection.available}:${projection.frozen}:${projection.sequence}`, actual: `${account.available}:${account.frozen}:${account.sequence}` })
+        await this.orders.event(manager, order.id, 'projection_rebuilt', job.actorId, `${job.reason}；账户${account.id}按不可变流水/批次/冻结证据重建，保留原差异；不变更流水或来源权益`)
+      }
+      if (differences.length && !repaired)
         await this.refunds.risk(manager, order, `reconcile_${id}`, 0n)
-      await manager.getRepository(ReconciliationEntity).update(id, { status: differences.length ? 'review' : 'done', findings, completedAt: () => 'NOW()' })
-      await this.orders.event(manager, order.id, 'reconciled', job.actorId, differences.length ? `发现${differences.length}项差异，保留审计并限制消费；禁止直接改余额` : job.verifyChannel ? '渠道事实和积分/批次/冻结/订单/额度一致' : '站内账务一致；本次明确未检查渠道')
+      await manager.getRepository(ReconciliationEntity).update(id, { status: differences.length && !repaired ? 'review' : 'done', findings, completedAt: () => 'NOW()' })
+      await this.orders.event(manager, order.id, 'reconciled', job.actorId, repaired ? '账户投影已按证据重建；原风险仍需人工审计处置' : differences.length ? `发现${differences.length}项差异，保留审计并限制消费；禁止无证据改余额` : job.verifyChannel ? '渠道事实和积分/批次/冻结/订单/额度一致' : '站内账务一致；本次明确未检查渠道')
     })
   }
 }

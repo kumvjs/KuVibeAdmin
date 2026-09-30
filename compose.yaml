@@ -1,0 +1,113 @@
+name: kuvibe-admin
+
+x-backend: &backend
+  image: kuvibe-admin-backend:local
+  build:
+    context: .
+    args:
+      NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+  init: true
+  environment:
+    NODE_ENV: ${NODE_ENV:-local}
+    APP_NAME: KuVibeAdmin
+    APP_PORT: '7001'
+    APP_BASE_URL: ${APP_BASE_URL:-http://localhost:7001}
+    APP_LOCALE: zh-CN
+    GLOBAL_PREFIX: ${GLOBAL_PREFIX-api}
+    APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:5999,http://localhost:5555}
+    AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+    AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-lax}
+    AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+    SWAGGER_ENABLE: ${SWAGGER_ENABLE:-true}
+    SWAGGER_PATH: api-docs
+    SWAGGER_VERSION: '1.0'
+    LOGGER_JSON: 'true'
+    LOGGER_COLORS: 'false'
+    TYPEORM_TYPE: postgres
+    TYPEORM_HOST: postgres
+    TYPEORM_PORT: '5432'
+    TYPEORM_USERNAME: ${POSTGRES_USER:-ku_vibe_admin}
+    TYPEORM_PASSWORD: ${POSTGRES_PASSWORD:?请运行 node scripts/docker-init.mjs 或配置 POSTGRES_PASSWORD}
+    TYPEORM_DATABASE: ${POSTGRES_DB:-ku_vibe_admin}
+    TYPEORM_SYNCHRONIZE: 'false'
+    REDIS_HOST: redis
+    REDIS_PORT: '6379'
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?请运行 node scripts/docker-init.mjs 或配置 REDIS_PASSWORD}
+    REDIS_DB: '0'
+    JWT_SECRET: ${JWT_SECRET:?请运行 node scripts/docker-init.mjs 或配置 JWT_SECRET}
+    JWT_EXPIRE: '86400'
+    REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?请运行 node scripts/docker-init.mjs 或配置 REFRESH_TOKEN_SECRET}
+    REFRESH_TOKEN_EXPIRE: '2592000'
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  backend:
+    <<: *backend
+    restart: unless-stopped
+    ports:
+      - '${DOCKER_HTTP_BIND:-127.0.0.1}:${DOCKER_HTTP_PORT:-7001}:7001'
+    volumes:
+      - attachments:/app/var/attachments
+      - public:/app/public
+    stop_grace_period: 30s
+
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:18.6-bookworm}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ku_vibe_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请配置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ku_vibe_admin}
+      TZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:8-bookworm}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请配置 REDIS_PASSWORD}
+    # 密码由容器环境传入，避免 Compose 插值破坏特殊字符。
+    command: ['/bin/sh', '-c', 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    <<: *backend
+    profiles: [tools]
+    restart: 'no'
+    healthcheck:
+      disable: true
+    command: ['node', 'node_modules/typeorm/cli.js', '-d', 'dist/src/config/database.config.js', 'migration:run']
+
+  setup:
+    <<: *backend
+    profiles: [tools]
+    restart: 'no'
+    stdin_open: true
+    tty: true
+    healthcheck:
+      disable: true
+    # setup 要求环境文件存在；密钥已从环境注入，空文件仅供既有脚本读取。
+    command: ['/bin/sh', '-c', 'touch ".env.$${NODE_ENV}" && exec node dist/src/scripts/setup.js']
+
+volumes:
+  postgres-data:
+  redis-data:
+  attachments:
+  public:

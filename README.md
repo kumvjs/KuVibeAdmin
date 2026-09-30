@@ -45,6 +45,21 @@ pnpm start:local
 
 已有部署升级前必须审查迁移。时间戳迁移 `1789648814246` 以旧值代表 UTC 为前提；其他部署需确认自己的历史语义。生产禁止依赖 `synchronize`，部署要求和恢复方案见[快速开始](docs/guide/getting-started.md)。
 
+## Docker 运行
+
+Docker 方式可一次运行后端、PostgreSQL 和 Redis：
+
+```bash
+node scripts/docker-init.mjs
+docker compose build backend
+docker compose up -d --wait postgres redis
+docker compose run --rm migrate
+docker compose run --rm setup
+docker compose up -d --wait backend
+```
+
+初始化会交互创建管理员；根 `.env` 保存随机密钥和容器配置。首次启动、持久化、升级和生产 HTTPS 设置见 [Docker 指南](docs/guide/docker.md)。
+
 ## 根目录常用命令
 
 | 命令 | 用途 |

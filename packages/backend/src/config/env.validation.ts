@@ -46,7 +46,7 @@ export const envValidationSchema = Joi.object({
   AUTH_COOKIE_SAME_SITE: Joi.string()
     .valid('lax', 'none', 'strict')
     .default('lax'),
-  AUTH_COOKIE_DOMAIN: Joi.string().hostname().optional(),
+  AUTH_COOKIE_DOMAIN: Joi.string().hostname().empty('').optional(),
 
   JWT_SECRET: Joi.string().required(),
 

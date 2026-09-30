@@ -2,6 +2,8 @@
 
 配置由 `@nestjs/config` 加载，顺序为 `.env.<NODE_ENV>`、`.env`；前者优先。Joi 在启动时校验数据库、Redis 与 JWT 等必需项。
 
+Docker Compose 使用仓库根 `.env` 进行插值，并显式注入容器环境；该文件不会复制到镜像，也不使用宿主机 `packages/backend/.env.local`。容器环境优先于环境文件。完整步骤见 [Docker 部署](docker.md)。
+
 ## 应用与接口
 
 | 变量 | 默认值 | 说明 |

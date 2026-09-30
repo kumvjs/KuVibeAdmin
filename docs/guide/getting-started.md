@@ -111,6 +111,8 @@ pnpm setup
 
 ## 启动
 
+通过 Docker 同时运行后端、PostgreSQL 和 Redis 时，使用 [Docker 部署指南](docker.md)。容器配置放在根 `.env`，不复用本地 `.env.local`；迁移和 setup 使用独立工具容器显式执行。
+
 ```bash
 # 本地环境，读取 .env.local
 pnpm start:local

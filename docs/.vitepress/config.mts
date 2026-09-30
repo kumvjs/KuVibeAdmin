@@ -23,6 +23,7 @@ export default defineConfig({
         items: [
           { text: '项目概览', link: '/guide/overview' },
           { text: '快速开始', link: '/guide/getting-started' },
+          { text: 'Docker 部署', link: '/guide/docker' },
           { text: '发布验收', link: '/guide/release-verification' },
           { text: '配置说明', link: '/guide/configuration' },
           { text: '时间与时区', link: '/guide/timezone' },

@@ -17,6 +17,22 @@ const validEnvironment = {
 }
 
 describe('browser security configuration', () => {
+  it('容器空 Cookie Domain 沿用 host-only，非法非空域名仍被拒绝', () => {
+    const blank = envValidationSchema.validate({
+      ...validEnvironment,
+      AUTH_COOKIE_DOMAIN: '',
+      NODE_ENV: 'local',
+    })
+    expect(blank.error).toBeUndefined()
+    expect(buildBrowserSecurityConfig({ AUTH_COOKIE_DOMAIN: '', NODE_ENV: 'local' }).refreshCookie.domain).toBeUndefined()
+    const invalid = envValidationSchema.validate({
+      ...validEnvironment,
+      AUTH_COOKIE_DOMAIN: 'https://api.example.com/path',
+      NODE_ENV: 'local',
+    })
+    expect(invalid.error).toBeDefined()
+  })
+
   it('uses credential-compatible Vben origins and a host-only local cookie', () => {
     const config = buildBrowserSecurityConfig({
       APP_BASE_URL: 'http://localhost:7001',

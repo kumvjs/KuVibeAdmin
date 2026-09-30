@@ -58,3 +58,10 @@ order: number
 - CommonEntity 审计时间与令牌/附件过期时间使用显式 timestamptz 默认精度，不配置 precision；实体保持 Date。PostgreSQL 连接池通过 extra.options 统一 UTC。
 - sys_user.timezone 只表示展示偏好，null 跟随设备。TimezoneModule 已完成 M6，选项公开、个人偏好读写需登录。
 - 统一工具为 packages/backend/src/utils/time.util.ts；业务日期运算必须传 IANA 时区，半开时间点边界用于 SQL 查询，不自动读取用户时区。权益/活动时区策略由业务定义。详见 docs/guide/timezone.md。
+
+
+### Docker 部署
+
+- 后端镜像使用 Node.js 24 Debian slim、pnpm 11.25.0，按 backend 独立锁文件冻结安装，沿用根工作区原生依赖构建许可；编译、生产依赖和运行阶段分离。
+- Compose 固定 PostgreSQL 18.6-bookworm，卷挂 /var/lib/postgresql；Redis 8 开启 AOF，内部服务使用 service DNS，不向宿主机发布数据库/Redis 端口。
+- 根 .env 不进镜像；工具直接调用编译 CLI 保留 NODE_ENV，setup 使用已有注入密钥；HTTP 健康检查使用生产也公开的时区只读接口。见 docs/guide/docker.md。

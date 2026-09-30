@@ -11,7 +11,7 @@ import { SysRoleEntity } from '../dist/src/modules/system/role/entities/role.ent
 import SysUserRoleEntity from '../dist/src/modules/user/entities/user-role.entity.js'
 import { SysUserEntity } from '../dist/src/modules/user/entities/user.entity.js'
 import { UserRoleService } from '../dist/src/modules/user/user-role/user-role.service.js'
-import { initializeBaseData } from '../dist/src/scripts/setup-data.js'
+import { INITIAL_MENUS, initializeBaseData } from '../dist/src/scripts/setup-data.js'
 import 'reflect-metadata'
 
 test('基础数据完整、最小授权、可重复执行并保护已有数据', async () => {
@@ -56,6 +56,14 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     }
     const attachment = await menus.findOneByOrFail({ authCode: 'system:attachment:read' })
     const system = await menus.findOneByOrFail({ name: 'System' })
+    const billingGroups = await Promise.all(['SystemPoints', 'SystemBilling'].map(name => menus.findOneByOrFail({ name })))
+    // 新库直接创建顶级业务目录；旧库迁出时保留管理员配置和已有授权。
+    for (const group of billingGroups) {
+      assert.equal(group.pid, null)
+      group.meta = { ...group.meta, title: `自定义${group.meta.title}`, order: group.meta.order + 10 }
+      await menus.update(group.id, { pid: system.id, meta: group.meta })
+      await links.save({ roleId: other.id, menuId: group.id })
+    }
     const attachmentGroup = await menus.findOneByOrFail({ name: 'SystemAttachment' })
     assert.equal(attachmentGroup.pid, system.id)
     assert.equal(attachmentGroup.type, 'catalog')
@@ -74,6 +82,16 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
       { roleId: other.id, menuId: attachment.id },
     ])
     const repaired = await initializeBaseData(source)
+    for (const group of billingGroups) {
+      const upgraded = await menus.findOneByOrFail({ id: group.id })
+      assert.equal(upgraded.pid, null)
+      assert.equal(upgraded.name, group.name)
+      assert.equal(upgraded.path, group.path)
+      assert.equal(upgraded.component, group.component)
+      assert.equal(upgraded.authCode, group.authCode)
+      assert.deepEqual(upgraded.meta, group.meta)
+      assert.equal(await links.countBy({ roleId: other.id, menuId: group.id }), 1)
+    }
     for (const route of billingRoutes) {
       const upgraded = await menus.findOneByOrFail({ id: route.id })
       assert.equal(upgraded.type, 'menu')
@@ -95,7 +113,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     assert.equal(await source.getRepository(SysDeptEntity).count(), 1)
     assert.equal(await roles.count(), 2)
     assert.deepEqual((await links.findBy({ roleId: ordinary.id })).map(link => link.menuId), [business.id])
-    assert.equal(await links.countBy({ roleId: other.id }), 5)
+    assert.equal(await links.countBy({ roleId: other.id }), 7)
     assert.deepEqual((await menus.findOneByOrFail({ id: dept.id })).meta, { title: '我的部门', order: 42 })
     const runtime = new MenuService(menus, new UserRoleService(userRoles), {})
     assert.deepEqual(await runtime.getPermissionsByUserId(user.id), ['business:order:read'])
@@ -103,11 +121,23 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     const superRole = await roles.save({ code: 'super', name: 'super', status: 1, isDefault: false })
     await userRoles.save({ userId: user.id, roleId: superRole.id })
     const routes = await runtime.getAllMenusByUserId(user.id)
-    assert.deepEqual(routes[0].children.map(route => route.name), ['SystemMenu', 'SystemRole', 'SystemUser', 'SystemAttachment', 'SystemPoints', 'SystemBilling', 'SystemDept'])
-    assert.equal(routes[0].children.length, 7)
+    assert.deepEqual(routes.map(route => route.name), ['SystemPoints', 'SystemBilling', 'System'])
+    const systemRoute = routes.find(route => route.name === 'System')
+    assert.deepEqual(systemRoute.children.map(route => route.name).sort(), INITIAL_MENUS.filter(menu => menu.parent === 'System' && menu.type !== 'button').map(menu => menu.name).sort())
+    assert.deepEqual(routes.find(route => route.name === 'SystemPoints').children.map(route => route.name), ['PointsRead'])
+    assert.deepEqual(routes.find(route => route.name === 'SystemBilling').children.map(route => route.name).sort(), ['BillingCatalogRead', 'BillingOrderRead', 'BillingPromotionRead'])
     assert.ok((await runtime.getPermissionsByUserId(user.id)).includes('system:attachment:read'))
     await initializeBaseData(source)
     assert.equal(await menus.count(), 43)
+
+    // 未知目录归属拒绝覆盖；前面已执行的业务目录调整也必须一起回滚。
+    await menus.update(billingGroups[0].id, { pid: system.id })
+    await menus.update(billingGroups[1].id, { pid: dept.id })
+    await assert.rejects(initializeBaseData(source), /初始化菜单冲突/)
+    assert.equal((await menus.findOneByOrFail({ id: billingGroups[0].id })).pid, system.id)
+    assert.equal((await menus.findOneByOrFail({ id: billingGroups[1].id })).pid, dept.id)
+    for (const group of billingGroups)
+      await menus.update(group.id, { pid: null })
 
     // 非旧版根目录归属不应被覆盖。
     await menus.update(attachment.id, { pid: dept.id })

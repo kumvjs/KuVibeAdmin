@@ -51,7 +51,7 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['UploadPolicyRead', '查看上传策略', UPLOAD_POLICY_PERMISSIONS.READ],
     ['UploadPolicyWrite', '配置上传策略', UPLOAD_POLICY_PERMISSIONS.WRITE],
   ] as const).map(([name, title, authCode]): SeedMenu => ({ name, parent: 'SystemAttachment', authCode, type: MenuType.BUTTON, meta: { title } })),
-  { name: 'SystemPoints', parent: 'System', path: '/system/points', type: MenuType.CATALOG, meta: { title: '积分管理', icon: 'lucide:coins', order: 5 } },
+  { name: 'SystemPoints', path: '/system/points', type: MenuType.CATALOG, meta: { title: '积分管理', icon: 'lucide:coins', order: 5 } },
   ...([
     ['Read', '查看账户与流水', POINT_PERMISSIONS.READ],
     ['Grant', '增加积分', POINT_PERMISSIONS.GRANT],
@@ -61,7 +61,7 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['Unfreeze', '解冻积分', POINT_PERMISSIONS.UNFREEZE],
     ['Reverse', '冲正积分', POINT_PERMISSIONS.REVERSE],
   ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Points${suffix}`, parent: 'SystemPoints', authCode, ...(suffix === 'Read' ? { path: '/system/points/accounts', component: '/system/points/list', type: MenuType.MENU } : { type: MenuType.BUTTON }), meta: { title } })),
-  { name: 'SystemBilling', parent: 'System', path: '/system/billing', type: MenuType.CATALOG, meta: { title: '充值运营', icon: 'lucide:wallet', order: 6 } },
+  { name: 'SystemBilling', path: '/system/billing', type: MenuType.CATALOG, meta: { title: '充值运营', icon: 'lucide:wallet', order: 6 } },
   ...([
     ['CatalogRead', '查看套餐与商品', CATALOG_PERMISSIONS.READ],
     ['CatalogWrite', '编辑套餐与商品', CATALOG_PERMISSIONS.WRITE],
@@ -94,6 +94,9 @@ async function seedMenus(manager: EntityManager): Promise<void> {
     // 兼容旧种子：五项附件权限曾直接挂在 System 下，只调整父级以保留授权关联。
     const moveLegacyAttachment = current && seed.parent === 'SystemAttachment'
       && seed.type === MenuType.BUTTON && current.pid === ids.get('System')
+    // 积分和充值是独立业务目录：旧版只调整父级，保留 ID、元数据和角色授权。
+    const moveLegacyBilling = current && ['SystemPoints', 'SystemBilling'].includes(seed.name)
+      && !seed.parent && seed.type === MenuType.CATALOG && current.pid === ids.get('System')
     // 本次增加Web页面：只升级明确的旧账务只读按钮，保留ID及原角色授权。
     const promoteBillingRead = current && ['PointsRead', 'BillingCatalogRead', 'BillingPromotionRead', 'BillingOrderRead'].includes(seed.name)
       && current.type === MenuType.BUTTON && seed.type === MenuType.MENU
@@ -102,12 +105,12 @@ async function seedMenus(manager: EntityManager): Promise<void> {
       current.deletedAt || current.status !== MenuStatus.ENABLED
       || current.name !== seed.name || ((current.path ?? null) !== (seed.path ?? null) && !promoteBillingRead)
       || (current.authCode ?? null) !== (seed.authCode ?? null)
-      || (current.type !== seed.type && !promoteBillingRead) || ((current.pid ?? null) !== pid && !moveLegacyAttachment)
+      || (current.type !== seed.type && !promoteBillingRead) || ((current.pid ?? null) !== pid && !moveLegacyAttachment && !moveLegacyBilling)
       || ((current.component ?? null) !== (seed.component ?? null) && !promoteBillingRead)
     ))) {
       throw new Error(`初始化菜单冲突：${seed.name}；请核对已有记录，脚本不会覆盖或恢复它。`)
     }
-    if (moveLegacyAttachment)
+    if (moveLegacyAttachment || moveLegacyBilling)
       await repository.update(current.id, { pid })
     if (promoteBillingRead) {
       Object.assign(current, { type: seed.type, path: seed.path, component: seed.component })

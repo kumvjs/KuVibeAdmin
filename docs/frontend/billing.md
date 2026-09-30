@@ -11,7 +11,9 @@ node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build frontend
 node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait frontend
 ```
 
-打开 `http://localhost:5999`，使用自己通过 `setup` 创建的管理员账户。没有内置演示账户或默认密码。前端服务以普通 `node` 用户运行，依赖保留在 Linux 镜像中；源码、Vite 配置和测试配置只读挂载，轮询监听适配 Windows。新增依赖时重新构建镜像，日常修改源码自动刷新。
+打开 `http://localhost:5999` 或 `http://127.0.0.1:5999`，使用自己通过 `setup` 创建的管理员账户。登录页保留 Vben 原有表单与交互；界面的示例账号/密码不代表后端已创建对应账户，需填写实际账户并完成原页面验证。前端服务以普通 `node` 用户运行，依赖保留在 Linux 镜像中；源码、Vite 配置和应用测试目录只读挂载，轮询监听适配 Windows。新增依赖时重新构建镜像，日常修改源码自动刷新。
+
+此前端开发覆盖文件在已有 `APP_CORS_ORIGINS` 基础上补齐上述两个精确来源，避免仅允许 localhost 时访问 127.0.0.1 报“请求来源不受信任”。配置更改须执行上面的 `up -d --wait` 重建应用容器；只执行 `restart` 不会更新环境变量。生产仍须显式配置 HTTPS 来源，不使用此开发覆盖文件。
 
 Docker 的 `/api` 代理访问 `http://backend:7001`；宿主运行时默认代理 `http://127.0.0.1:17001`。宿主开发须先在 `packages/frontend` 冻结安装其独立锁文件，复制 `playground/.env.example` 为 `playground/.env`，再执行 `pnpm dev:play`。后端使用自己的锁文件，不能混用宿主与容器依赖。
 
@@ -49,8 +51,10 @@ Apple/Google 在网页提供固定商品映射和历史权益展示，付款与�
 
 ```bash
 node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec frontend pnpm typecheck
-node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec --workdir /workspace/frontend frontend pnpm exec vitest run --config billing.vitest.config.ts
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec --workdir /workspace/frontend frontend pnpm exec vitest run --config playground/tests/vitest.config.ts
 node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec frontend pnpm build
 ```
+
+`playground/tests/vitest.config.ts` 是项目应用的测试入口，继承 Vben 根目录已有 `vitest.config.ts`，补充应用 `#` 别名并限定 `playground/tests` 的用例；测试覆盖金额/积分精度、幂等重试、付款轮询和真实认证适配，不参与应用运行。没有增加测试依赖，也不修改 Vben 通用测试配置。前端上游修改边界见仓库 [Agent 规范](https://github.com/kumvjs/KuVibeAdmin/blob/main/AGENTS.md#vben-上游维护边界)。
 
 生产构建使用同源 `/api`，部署时须由 HTTPS 反向代理转发到后端并沿用其安全 Cookie/CORS 配置。开发 Vite 代理和 Docker 热更新服务不代替生产静态站点部署。

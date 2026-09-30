@@ -15,7 +15,7 @@
 | API contract | Swagger/OpenAPI plus global `{ code, data, message, success, traceId }` envelope | common decorators/interceptors | High |
 | Package manager | pnpm 11 workspace-style repository | lockfiles and package manager fields | High |
 | Frontend | Vben/Vue 3.5.41、Vite 8.3、Antdv Next、TypeScript 6 | frontend workspace catalog 与 playground | High |
-| Tests | Backend Jest/Supertest；frontend Vitest/happy-dom | backend test config、frontend billing.vitest.config.ts | High |
+| Tests | Backend Jest/Supertest；frontend Vitest/happy-dom | backend test config、frontend playground/tests/vitest.config.ts | High |
 | Docs | VitePress Markdown | `docs/package.json`, `.vitepress/config.mts` | High |
 
 ## Required engineering rules

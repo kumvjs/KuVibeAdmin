@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { useAuthStore } from './auth';
+import { useAuthStore } from '#/store/auth';
 
 const mocks = vi.hoisted(() => ({
   access: {

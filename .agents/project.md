@@ -25,6 +25,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 ## Established constraints
 
 - Keep NestJS, TypeORM, PostgreSQL, Redis, Fastify, pnpm, and ESM; normal feature work must not reopen stack selection.
+- Vben 源码升级与业务修改遵循根 AGENTS.md 的“Vben 上游维护边界”：业务通过应用扩展，未提出登录界面需求时保留其上游交互；必要修改逐项记录依据。
 - Default HTTP prefix is `/api`.
 - Public API responses are wrapped by the global response interceptor unless explicitly skipped.
 - Swagger/OpenAPI is the canonical endpoint reference; planning artifacts must not become a duplicate public API manual.

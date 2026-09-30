@@ -8,7 +8,7 @@ import {
   money,
   points,
   useTask,
-} from './helpers';
+} from '#/views/billing/helpers';
 
 const state = vi.hoisted(() => ({ userInfo: { userId: '9007199254740993' } }));
 vi.mock('@vben/stores', () => ({

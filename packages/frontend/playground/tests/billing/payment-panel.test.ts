@@ -3,7 +3,7 @@ import { createApp, h, nextTick } from 'vue';
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import PaymentPanel from './payment-panel.vue';
+import PaymentPanel from '#/views/billing/payment-panel.vue';
 
 const api = vi.hoisted(() => ({
   getOrder: vi.fn(),

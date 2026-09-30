@@ -1,4 +1,8 @@
 services:
+  backend:
+    environment:
+      # 仅此前端开发覆盖文件补齐两个精确来源，保留部署者已有白名单。
+      APP_CORS_ORIGINS: '${APP_CORS_ORIGINS:-http://localhost:5999,http://localhost:5555},http://localhost:5999,http://127.0.0.1:5999'
   frontend:
     image: kuvibe-admin-frontend:dev
     build:
@@ -16,7 +20,7 @@ services:
     volumes:
       - ./packages/frontend/playground/src:/workspace/frontend/playground/src:ro
       - ./packages/frontend/playground/vite.config.ts:/workspace/frontend/playground/vite.config.ts:ro
-      - ./packages/frontend/billing.vitest.config.ts:/workspace/frontend/billing.vitest.config.ts:ro
+      - ./packages/frontend/playground/tests:/workspace/frontend/playground/tests:ro
     depends_on:
       backend:
         condition: service_healthy

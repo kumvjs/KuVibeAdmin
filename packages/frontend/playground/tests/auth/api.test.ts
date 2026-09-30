@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { loginApi, logoutApi, refreshTokenApi } from './auth';
+import { loginApi, logoutApi, refreshTokenApi } from '#/api/core/auth';
 
 const client = vi.hoisted(() => ({
   rawPost: vi.fn(),

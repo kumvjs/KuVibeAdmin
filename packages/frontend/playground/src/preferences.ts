@@ -19,7 +19,7 @@ interface PlaygroundPreferencesExtension {
 export const overridesPreferences = defineOverridesPreferences({
   // overrides
   app: {
-    name: import.meta.env.VITE_APP_TITLE,
+    name: import.meta.env.VITE_APP_TITLE || 'KuVibeAdmin',
   },
   copyright: appCopyrightPreferences,
 });

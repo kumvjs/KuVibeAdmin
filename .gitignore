@@ -61,3 +61,6 @@ tsconfig.build.tsbuildinfo
 
 # pnpm
 .pnpm-store
+
+# Swagger 启动时导出的本地契约快照
+/packages/backend/openapi/

@@ -4,7 +4,7 @@
 
 ## Product
 
-KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。当前仅交付后端，Vben 前端独立接入；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
+KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。已交付 NestJS 后端及 Vben Playground 的独立 OpenAPI 生成客户端，原有 Vben 页面逐步接入；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
 
 ## Users and domain
 
@@ -14,7 +14,8 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 ## Repository shape
 
-- `packages/backend`: NestJS application and database migrations.
+- `packages/backend`: NestJS application, Swagger artifact, and database migrations.
+- `packages/frontend/playground`: Vben Playground and generated OpenAPI client.
 - `packages/backend/src/modules/auth`: login, refresh, logout, token lifecycle.
 - `packages/backend/src/modules/user`: current-user data and user-role relationships.
 - `packages/backend/src/modules/system`: system users, roles, menus, and logs.
@@ -39,7 +40,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 ## 产品版本约定
 
-- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `1.2.2`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
+- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `1.3.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
 - 撤销此前“开发期默认延后递增”的 Agent 推断：缺少发布脚本、CHANGELOG 及历史递增记录不能证明存在延后政策。仅明确用户决定、发布政策或实际生效的自动化及其递增触发条件可支持 deferred；旧工程笔记保留作历史，不作为例外依据。
 - 固定统一版本：以根 `package.json` 为发布权威，`packages/backend/package.json` 同步相同版本；依据为用户在 2026-09-17 本次刷新中明确选择“统一版本：根目录与 core 同步递增”。按整个完成需求的最高语义影响递增一次，不按包分别重复递增；`docs/package.json` 继续无版本。
 - 每个完整需求通过实现、验收、审查和文档检查后，仅评估一次版本影响；按 `kuVibe.md` §30.1 记录需求标识、基线、目标、语义/有效影响及版本来源，重试沿用原决定。范围明确且无有效例外时实际递增，同步相关清单、内部依赖、锁文件和 CHANGELOG；总结必须报告影响、结果、旧版本 → 新版本及原因。

@@ -1,6 +1,7 @@
 import type { DataSource, EntityManager } from 'typeorm'
 import { In, IsNull } from 'typeorm'
 import { Roles } from '../modules/auth/auth.constant.js'
+import { CATALOG_PERMISSIONS } from '../modules/billing/catalog/catalog.types.js'
 import { POINT_PERMISSIONS } from '../modules/billing/points/points.types.js'
 import { DEPT_PERMISSIONS, DeptStatus } from '../modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '../modules/system/dept/entities/dept.entity.js'
@@ -59,6 +60,15 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['Unfreeze', '解冻积分', POINT_PERMISSIONS.UNFREEZE],
     ['Reverse', '冲正积分', POINT_PERMISSIONS.REVERSE],
   ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Points${suffix}`, parent: 'SystemPoints', authCode, type: MenuType.BUTTON, meta: { title } })),
+  { name: 'SystemBilling', parent: 'System', path: '/system/billing', type: MenuType.CATALOG, meta: { title: '充值运营', icon: 'lucide:wallet', order: 6 } },
+  ...([
+    ['CatalogRead', '查看套餐与商品', CATALOG_PERMISSIONS.READ],
+    ['CatalogWrite', '编辑套餐与商品', CATALOG_PERMISSIONS.WRITE],
+    ['CatalogPublish', '发布套餐', CATALOG_PERMISSIONS.PUBLISH],
+    ['PromotionRead', '查看活动', CATALOG_PERMISSIONS.PROMOTION_READ],
+    ['PromotionWrite', '编辑活动与发券', CATALOG_PERMISSIONS.PROMOTION_WRITE],
+    ['PromotionPublish', '发布活动', CATALOG_PERMISSIONS.PROMOTION_PUBLISH],
+  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Billing${suffix}`, parent: 'SystemBilling', authCode, type: MenuType.BUTTON, meta: { title } })),
 ]
 
 async function seedMenus(manager: EntityManager): Promise<void> {

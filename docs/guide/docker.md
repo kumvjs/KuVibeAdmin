@@ -44,7 +44,7 @@ node scripts/docker-dev.mjs run --rm setup
 node scripts/docker-dev.mjs up -d --wait backend
 ```
 
-`setup`交互创建管理员；不提供默认密码。源码和测试以只读bind mount进入容器，Nest watch编译产物写在容器内，Linux依赖不与宿主机node_modules混用。修改源码后自动编译/重启；清单/锁文件或Dockerfile改变后重新build。Windows挂载使用TypeScript轮询监听。
+`setup`交互创建管理员；不提供默认密码。源码和测试以只读bind mount进入容器，Nest watch编译产物写在容器内，Linux依赖不与宿主机node_modules混用。修改源码后自动编译/重启；新增模块目录后，若Windows挂载未触发重载，执行`node scripts/docker-dev.mjs restart backend`并等待编译完成。清单/锁文件或Dockerfile改变后重新build。Windows挂载使用TypeScript轮询监听。
 
 ```bash
 node scripts/docker-dev.mjs logs -f backend

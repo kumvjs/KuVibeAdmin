@@ -146,7 +146,7 @@ test('数据库阻止财务事实改删；软删除用户保留历史并拒绝�
 })
 
 test('迁移保留旧数据，空新表可往返，有财务数据拒绝回滚，实体无残留diff', async () => {
-  const migrationSource = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [] }).initialize()
+  const migrationSource = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,system,upload}/**/*.entity.js', 'dist/src/modules/billing/points/**/*.entity.js'] }).initialize()
   const runner = migrationSource.createQueryRunner()
   try {
     await runner.startTransaction()

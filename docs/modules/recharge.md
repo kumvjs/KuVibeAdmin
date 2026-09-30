@@ -1,6 +1,6 @@
 # 充值套餐与优惠
 
-当前已实现积分账户及套餐运营基础。支付订单与四渠道验真仍按开发计划推进，不能使用报价接口作为支付或到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
+当前已实现积分账户、套餐运营、订单创建/查询/取消与后台超时补偿。四渠道支付与验真仍按开发计划推进，不能使用报价或pending订单作为支付/到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
 
 ## 套餐与版本
 
@@ -26,6 +26,18 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 
 数据库额度桶记录预占和已售，具有非负与容量约束。预占按固定资源顺序加行锁，多项额度任一不足时全部回滚；订单与预占凭证必须在同一事务提交。核销和释放仅可对一次性的有效订单凭证进行，不能把内部额度方法直接暴露成API。
 
+## 订单与后台恢复
+
+下单必须提交用户确认的套餐版本ID、渠道、App/扫码形式和幂等键；微信/支付宝还须提交确认的整数分金额。套餐改版或报价变更返回409，需要重新报价。同键相同请求返回原订单，不再扣占；同键不同参数返回409。
+
+订单、不可变价格/权益/优惠快照、持久预占凭证、审计事件及outbox在一个事务提交。本人只能读取/取消本人订单；管理查看使用独立订单权限。微信/支付宝每位用户只保留一笔未结束订单，避免反复下单占光优惠和库存；内购不采用此现金订单限制。
+
+未向渠道发起请求的现金订单可以本地关单并一次性释放预占。已发起支付的取消或15分钟到期订单进入`closing`，必须先查单和确认渠道关单，不能仅依赖时间到期释放库存。内购不存在统一15分钟过期，不提供站内取消接口。当前支付适配尚未启用，不会直接创建支付凭证或发放充值积分。
+
+后台worker每5秒领取到期任务，数据库使用`FOR UPDATE SKIP LOCKED`和60秒租约，可由多个后端实例同时运行。崩溃后租约过期重新领取；每次租约令牌不同，旧worker不能完成新租约。失败指数退避至最多300秒，10次后保留`dead`记录供后续运维处理。业务处理须保持幂等，因为外部网络效果与数据库提交不能保证一起发生。
+
+设置`BILLING_WORKER_ENABLED=false`可停用当前实例的后台任务。渠道关单等未注册handler的任务不会被当作成功处理；实际接入后才能完成此类任务。运营前检查长期`closing`、`dead`和预占余额，不使用手工改快照/删流水绕过补偿。
+
 ## 开发验证
 
 使用[Docker开发环境](../guide/docker.md)，创建独立测试库，不在开发业务库执行并发测试：
@@ -34,6 +46,7 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 node scripts/docker-dev.mjs exec postgres createdb -U ku_vibe_admin kuvibe_billing_test
 node scripts/docker-dev.mjs exec postgres createdb -U ku_vibe_admin kuvibe_billing_test_migration
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/catalog.integration.mjs
+node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/orders.integration.mjs
 ```
 
 已创建测试库时跳过createdb；按实际`POSTGRES_USER`替换示例用户名。测试保留本次独立业务记录，使用随机业务标识避免跨次互相干扰。覆盖200并发抢每日20份、预算回滚与消费/释放、版本降额保护、券固定权益、内购映射、首单事实保护及迁移往返/旧数据保留/实体diff。并发测试验证一致性，不代表生产吞吐已验收。

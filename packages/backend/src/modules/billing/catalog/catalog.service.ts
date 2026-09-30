@@ -15,7 +15,7 @@ import { PackageVersionEntity, RechargePackageEntity } from './entities/recharge
 import { RechargeUserDayEntity, RechargeUserStateEntity } from './entities/recharge-user-state.entity.js'
 import { QuotaService } from './quota.service.js'
 
-export interface ApplicablePromotion extends PromotionCandidate { versionId: string, couponId: string | null }
+export interface ApplicablePromotion extends PromotionCandidate { versionId: string, couponId: string | null, startsAt: string, endsAt: string }
 export const couponHash = (code: string) => createHash('sha256').update(code.toUpperCase()).digest('hex')
 
 @Injectable()
@@ -185,14 +185,17 @@ export class CatalogService {
   }
 
   /** 订单调用时须先按固定顺序锁配置，再重新计算报价；查询报价仅供展示。 */
-  async applicablePromotions(manager: EntityManager, packageId: string, query: QuoteQueryDto, userId: string, now: Date, firstUser: boolean, firstDay: boolean): Promise<ApplicablePromotion[]> {
+  async applicablePromotions(manager: EntityManager, packageId: string, query: QuoteQueryDto, userId: string, now: Date, firstUser: boolean, firstDay: boolean, lockedIds?: string[]): Promise<ApplicablePromotion[]> {
     let coupon: CouponEntity | null = null
     if (query.couponCode) {
       coupon = await manager.getRepository(CouponEntity).findOneBy({ tenantId: '1', codeHash: couponHash(query.couponCode) })
       if (!coupon || (coupon.userId !== null && coupon.userId !== userId) || coupon.startsAt > now || coupon.endsAt <= now)
         throw new UnprocessableEntityException('券码无效、已过期或不属于本人')
     }
-    const rows = await manager.getRepository(PromotionEntity).createQueryBuilder('promotion').innerJoinAndMapOne('promotion.current', PromotionVersionEntity, 'version', 'version.promotionId = promotion.id AND version.revision = promotion.currentRevision').where('promotion.tenantId = 1 AND promotion.status = :status', { status: 'enabled' }).orderBy('promotion.id', 'ASC').getMany()
+    const builder = manager.getRepository(PromotionEntity).createQueryBuilder('promotion').innerJoinAndMapOne('promotion.current', PromotionVersionEntity, 'version', 'version.promotionId = promotion.id AND version.revision = promotion.currentRevision').where('promotion.tenantId = 1 AND promotion.status = :status', { status: 'enabled' })
+    if (lockedIds)
+      builder.andWhere(lockedIds.length ? 'promotion.id IN (:...lockedIds)' : 'FALSE', { lockedIds })
+    const rows = await builder.orderBy('promotion.id', 'ASC').getMany()
     const result: ApplicablePromotion[] = []
     for (const row of rows) {
       let version = (row as PromotionEntity & { current: PromotionVersionEntity }).current
@@ -212,7 +215,7 @@ export class CatalogService {
         continue
       if ((rules.eligibility === 'first_user' && !firstUser) || (rules.eligibility === 'first_day' && !firstDay))
         continue
-      result.push({ id: row.id, revision: version.revision, versionId: version.id, rules, couponId: rules.requiresCoupon ? coupon!.id : null })
+      result.push({ id: row.id, revision: version.revision, versionId: version.id, rules, startsAt: version.startsAt.toISOString(), endsAt: version.endsAt.toISOString(), couponId: rules.requiresCoupon ? coupon!.id : null })
     }
     if (coupon && !result.some(item => item.couponId === coupon!.id))
       throw new UnprocessableEntityException('券关联活动未发布或不满足适用范围与资格')

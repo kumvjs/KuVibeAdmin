@@ -2,6 +2,7 @@ import type { DataSource, EntityManager } from 'typeorm'
 import { In, IsNull } from 'typeorm'
 import { Roles } from '../modules/auth/auth.constant.js'
 import { CATALOG_PERMISSIONS } from '../modules/billing/catalog/catalog.types.js'
+import { ORDER_PERMISSIONS } from '../modules/billing/orders/order.types.js'
 import { POINT_PERMISSIONS } from '../modules/billing/points/points.types.js'
 import { DEPT_PERMISSIONS, DeptStatus } from '../modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '../modules/system/dept/entities/dept.entity.js'
@@ -69,6 +70,7 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['PromotionWrite', '编辑活动与发券', CATALOG_PERMISSIONS.PROMOTION_WRITE],
     ['PromotionPublish', '发布活动', CATALOG_PERMISSIONS.PROMOTION_PUBLISH],
   ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Billing${suffix}`, parent: 'SystemBilling', authCode, type: MenuType.BUTTON, meta: { title } })),
+  { name: 'BillingOrderRead', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.READ, type: MenuType.BUTTON, meta: { title: '查看订单' } },
 ]
 
 async function seedMenus(manager: EntityManager): Promise<void> {

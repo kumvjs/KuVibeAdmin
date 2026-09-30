@@ -10,7 +10,7 @@ export interface ReservedQuota { bucketId: string, amount: string }
 @Injectable()
 export class QuotaService {
   /** 调用方必须先锁住稳定套餐/活动配置，预占和订单记录使用同一事务。 */
-  async reserve(manager: EntityManager, demands: QuotaDemand[]): Promise<ReservedQuota[]> {
+  async reserve(manager: EntityManager, demands: QuotaDemand[]): Promise<(ReservedQuota & { resourceKey: string })[]> {
     if (!manager.queryRunner?.isTransactionActive)
       throw new Error('额度预占必须处于事务内')
     const merged = new Map<string, QuotaDemand>()
@@ -24,7 +24,7 @@ export class QuotaService {
         throw new Error('重复额度资源，请调用方先合并')
       merged.set(key, demand)
     }
-    const result: ReservedQuota[] = []
+    const result: (ReservedQuota & { resourceKey: string })[] = []
     const repository = manager.getRepository(QuotaBucketEntity)
     for (const [, demand] of [...merged.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       await repository.createQueryBuilder().insert().values({ resourceKey: demand.resourceKey, periodKey: demand.periodKey, limit: demand.limit, reserved: '0', sold: '0' }).orIgnore().execute()
@@ -37,7 +37,7 @@ export class QuotaService {
       if (next > PG_BIGINT_MAX || occupied > PG_BIGINT_MAX || (demand.limit !== null && occupied > BigInt(demand.limit)))
         throw new ConflictException('套餐限量、用户限购或优惠预算已用完')
       await repository.update(bucket.id, { limit: demand.limit, reserved: next.toString() })
-      result.push({ bucketId: bucket.id, amount: demand.amount })
+      result.push({ bucketId: bucket.id, amount: demand.amount, resourceKey: demand.resourceKey })
     }
     return result
   }

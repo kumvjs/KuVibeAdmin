@@ -1,5 +1,6 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger } from '@nestjs/common'
+import { ChannelPendingError } from '../payments/payment.types.js'
 import { PaymentsService } from '../payments/payments.service.js'
 import { OrdersService } from './orders.service.js'
 import { BillingOutboxService } from './outbox.service.js'
@@ -31,7 +32,7 @@ export class BillingWorker implements OnModuleInit, OnModuleDestroy {
       return
     this.active = true
     try {
-      for (const lease of await this.outbox.claim(['order_expire', 'payment_prepare', 'payment_poll', 'payment_inbox', 'order_close'], 5, 120)) {
+      for (const lease of await this.outbox.claim(['order_expire', 'payment_prepare', 'payment_poll', 'payment_inbox', 'order_close', 'google_consume'], 5, 120)) {
         try {
           if (lease.type === 'order_expire')
             await this.orders.expire(lease.aggregateId)
@@ -41,12 +42,17 @@ export class BillingWorker implements OnModuleInit, OnModuleDestroy {
             await this.payments.poll(lease.aggregateId)
           else if (lease.type === 'payment_inbox')
             await this.payments.processInbox(lease.aggregateId)
+          else if (lease.type === 'google_consume')
+            await this.payments.consume(lease.aggregateId)
           else
             await this.payments.close(lease.aggregateId)
           await this.outbox.complete(lease)
         }
-        catch {
-          await this.outbox.fail(lease, `${lease.type}_failed`)
+        catch (error) {
+          if (error instanceof ChannelPendingError)
+            await this.outbox.defer(lease, 60)
+          else
+            await this.outbox.fail(lease, `${lease.type}_failed`)
         }
       }
     }

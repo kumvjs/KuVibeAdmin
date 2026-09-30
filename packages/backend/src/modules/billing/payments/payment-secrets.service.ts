@@ -16,7 +16,7 @@ export class PaymentSecretsService {
   }
 
   open(value: SealedSecret, context: string) {
-    const { key, id } = this.config.dataKey()
+    const { key, id } = this.config.dataKey(value.keyId)
     if (value.keyId !== id)
       throw new Error('内购凭据密钥版本不匹配，保留待处理任务')
     const cipher = createDecipheriv('aes-256-gcm', key, Buffer.from(value.nonce, 'base64'))

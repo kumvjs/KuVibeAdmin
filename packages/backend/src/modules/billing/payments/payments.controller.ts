@@ -1,6 +1,6 @@
 import type { RawBodyRequest } from '@nestjs/common'
 import type { FastifyRequest } from 'fastify'
-import { Controller, Header, HttpCode, Param, Post, Req, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Header, HttpCode, Param, Post, Req, UnauthorizedException } from '@nestjs/common'
 import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ApiResult } from '#/common/decorators/api-result.decorator.js'
 import { CurrentUser } from '#/common/decorators/current-user.decorator.js'
@@ -9,7 +9,7 @@ import { SkipResponseTransform } from '#/common/decorators/skip-response-transfo
 import { ApiSecurityAuth } from '#/common/decorators/swagger.decorator.js'
 import { BillingIdDto } from '../catalog/dto/catalog.dto.js'
 import { AlipayProvider } from './alipay.provider.js'
-import { PaymentPrepareDto } from './dto/payments.dto.js'
+import { AppleNotificationDto, AppleReceiptDto, GoogleReceiptDto, PaymentPrepareDto, ReceiptAcceptedDto } from './dto/payments.dto.js'
 import { PaymentsService } from './payments.service.js'
 import { WechatProvider } from './wechat.provider.js'
 
@@ -25,6 +25,22 @@ export class PaymentsController {
   @ApiResult({ type: PaymentPrepareDto })
   prepare(@CurrentUser() user: LoginUserContext, @Param() params: BillingIdDto) {
     return this.payments.prepare(user.uid, params.id)
+  }
+
+  @Post(':id/apple-receipt')
+  @HttpCode(200)
+  @ApiOperation({ summary: '提交Apple消耗型交易查验任务；必须订单paid后才让StoreKit finish' })
+  @ApiResult({ type: ReceiptAcceptedDto })
+  apple(@CurrentUser() user: LoginUserContext, @Param() params: BillingIdDto, @Body() dto: AppleReceiptDto) {
+    return this.payments.receipt(user.uid, params.id, dto)
+  }
+
+  @Post(':id/google-receipt')
+  @HttpCode(200)
+  @ApiOperation({ summary: '持久化Google消耗型token验真任务；服务端入账后消费确认' })
+  @ApiResult({ type: ReceiptAcceptedDto })
+  google(@CurrentUser() user: LoginUserContext, @Param() params: BillingIdDto, @Body() dto: GoogleReceiptDto) {
+    return this.payments.receipt(user.uid, params.id, dto)
   }
 }
 
@@ -50,6 +66,25 @@ export class PaymentNotificationsController {
   async alipayNotify(@Req() request: RawBodyRequest<FastifyRequest>) {
     await this.payments.acceptCash(this.alipay.notification(this.raw(request)))
     return 'success'
+  }
+
+  @Post('apple/notify')
+  @Public()
+  @SkipResponseTransform()
+  @HttpCode(200)
+  @ApiExcludeEndpoint()
+  async appleNotify(@Body() body: AppleNotificationDto) {
+    await this.payments.acceptApple(body.signedPayload)
+  }
+
+  @Post('google/notify')
+  @Public()
+  @SkipResponseTransform()
+  @HttpCode(204)
+  @ApiExcludeEndpoint()
+  async googleNotify(@Req() request: RawBodyRequest<FastifyRequest>) {
+    this.raw(request)
+    await this.payments.acceptGoogle(request.body, request.headers.authorization)
   }
 
   private raw(request: RawBodyRequest<FastifyRequest>) {

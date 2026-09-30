@@ -10,6 +10,7 @@ export interface InboxPayload {
   payment?: ProviderPayment
   transactionId?: string
   secret?: SealedSecret
+  notice?: SealedSecret
   applicationId?: string
   environment?: 'sandbox' | 'production'
   notificationType?: string

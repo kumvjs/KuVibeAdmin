@@ -7,7 +7,7 @@ import { SysUserEntity } from '#/modules/user/entities/user.entity.js'
 import { getBusinessDate } from '#/utils/time.util.js'
 import { CatalogService } from '../catalog/catalog.service.js'
 import { calculateQuote } from '../catalog/catalog.types.js'
-import { PromotionVersionEntity } from '../catalog/entities/promotion.entity.js'
+import { CouponEntity, PromotionVersionEntity } from '../catalog/entities/promotion.entity.js'
 import { RechargeUserDayEntity, RechargeUserStateEntity } from '../catalog/entities/recharge-user-state.entity.js'
 import { QuotaService } from '../catalog/quota.service.js'
 import { OrderReservationEntity } from '../orders/entities/order-reservation.entity.js'
@@ -41,6 +41,10 @@ export class SettlementService {
         if (payment.state === 'refunded') {
           await this.review(manager, order, inboxId, 'verified_refund_requires_recovery')
           return { status: 'review' }
+        }
+        if (payment.state === 'closed' && ['apple', 'google'].includes(order.channel) && order.status === 'pending') {
+          await manager.getRepository(RechargeOrderEntity).update(id, { status: 'closed', closedAt: () => 'NOW()' })
+          await this.orders.event(manager, id, 'store_cancelled', null, '已验真商店取消，未发放权益或占用首单资格')
         }
         await this.done(manager, inboxId)
         return { status: payment.state }
@@ -100,21 +104,32 @@ export class SettlementService {
       return false
     if (['wechat', 'alipay'].includes(order.channel))
       return payment.merchantNo === order.merchantNo && (payment.state !== 'paid' || (payment.amountMinor === order.payableMinor && payment.currency === 'CNY'))
-    return payment.productId === order.snapshot.productId && payment.bindingToken === attempt.storeToken && (!payment.storeAccountId || payment.storeAccountId === binding.storeAccountId)
+    return payment.productId === order.snapshot.productId && payment.bindingToken === attempt.storeToken && (order.channel !== 'google' || payment.storeAccountId === binding.storeAccountId)
   }
 
   private async bonus(manager: EntityManager, order: RechargeOrderEntity, date: string, now: Date, firstUser: boolean, firstDay: boolean) {
     let points = order.snapshot.guaranteedBonusPoints
-    const candidates = order.snapshot.conditionalBonuses.filter(item => item.rules.eligibility === 'always' || (item.rules.eligibility === 'first_user' ? firstUser : firstDay))
+    let candidates = order.snapshot.conditionalBonuses.filter(item => item.rules.eligibility === 'always' || (item.rules.eligibility === 'first_user' ? firstUser : firstDay))
       .filter(item => new Date(item.startsAt) <= now && new Date(item.endsAt) > now)
       .map(item => ({ item, points: calculateQuote(order.snapshot.priceMinor, order.snapshot.basePoints, [item]).bonusPoints }))
       .filter(item => BigInt(item.points) > BigInt(points))
       .sort((a, b) => BigInt(a.points) === BigInt(b.points) ? b.item.rules.priority - a.item.rules.priority || (BigInt(a.item.id) < BigInt(b.item.id) ? -1 : 1) : BigInt(a.points) > BigInt(b.points) ? -1 : 1)
+    const coupons = new Map<string, CouponEntity>()
+    for (const candidate of candidates.filter(item => item.item.couponId)) {
+      const coupon = await manager.getRepository(CouponEntity).findOneByOrFail({ id: candidate.item.couponId!, tenantId: '1' })
+      if (coupon.startsAt <= now && coupon.endsAt > now && (coupon.userId === null || coupon.userId === order.userId))
+        coupons.set(coupon.id, coupon)
+    }
+    candidates = candidates.filter(item => !item.item.couponId || coupons.has(item.item.couponId))
+    const demands = (promotion: ApplicablePromotion, amount: string) => [
+      ...this.bonusDemands(order, date, promotion, amount),
+      ...(promotion.couponId ? [{ resourceKey: `coupon:${promotion.couponId}:total`, periodKey: 'lifetime', limit: coupons.get(promotion.couponId)!.totalLimit, amount: '1' }] : []),
+    ]
     const locks = new Map<string, Awaited<ReturnType<CatalogService['lockPromotion']>>>()
     for (const id of [...new Set(candidates.map(item => item.item.id))].sort((a, b) => BigInt(a) < BigInt(b) ? -1 : 1))
       locks.set(id, await this.catalog.lockPromotion(manager, id, 'pessimistic_read'))
     const held = await manager.getRepository(OrderReservationEntity).findBy({ orderId: order.id, status: 'held' })
-    await this.quotas.lockForSettlement(manager, candidates.flatMap(item => this.bonusDemands(order, date, item.item, item.points)), held)
+    await this.quotas.lockForSettlement(manager, candidates.flatMap(item => demands(item.item, item.points)), held)
     for (const candidate of candidates) {
       const stable = locks.get(candidate.item.id)!
       if (stable.status !== 'enabled')
@@ -132,7 +147,7 @@ export class SettlementService {
         continue
       await manager.query('SAVEPOINT optional_bonus')
       try {
-        const reserved = await this.quotas.reserve(manager, this.bonusDemands(order, date, { ...candidate.item, rules }, candidate.points))
+        const reserved = await this.quotas.reserve(manager, demands({ ...candidate.item, rules }, candidate.points))
         await manager.getRepository(OrderReservationEntity).insert(reserved.map(item => ({ orderId: order.id, bucketId: item.bucketId, amount: item.amount, purpose: 'settlement' as const, status: 'held' as const })))
         // 新活动预算成功后，才释放原保证赠分预占；失败时仍兑现原保证权益。
         const old = await manager.getRepository(OrderReservationEntity).findBy({ orderId: order.id, status: 'held', purpose: 'bonus' })

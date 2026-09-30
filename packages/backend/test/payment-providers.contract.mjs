@@ -1,8 +1,9 @@
 /* eslint-disable antfu/no-import-dist -- 验签使用本地临时RSA密钥，网络应答为契约替身，不代表商户联调。 */
 import assert from 'node:assert/strict'
-import { createCipheriv, generateKeyPairSync, sign, verify } from 'node:crypto'
+import { createCipheriv, createHash, generateKeyPairSync, sign, verify } from 'node:crypto'
 import { test } from 'node:test'
 import { AlipayProvider } from '../dist/src/modules/billing/payments/alipay.provider.js'
+import { GoogleProvider } from '../dist/src/modules/billing/payments/google.provider.js'
 import { wechatCanonical, WechatProvider } from '../dist/src/modules/billing/payments/wechat.provider.js'
 
 const merchant = generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -68,3 +69,27 @@ test('支付宝官方SDK验已解码通知、拒绝篡改和重复参数，App�
   const signed = [...form].filter(([key]) => key !== 'sign').sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`).join('&')
   assert.ok(verify('RSA-SHA256', Buffer.from(signed), merchant.publicKey, Buffer.from(form.get('sign'), 'base64')))
 })
+
+test('Google productsv2按token去重、待付款不假造完成时间、检测测试环境与部分退款', async () => {
+  const provider = new GoogleProvider({ ...config, settings: { google: [{ enabled: true, packageName: 'test.app', environment: 'sandbox' }] } })
+  const data = { purchaseStateContext: { purchaseState: 'PURCHASED' }, testPurchaseContext: { fopType: 'TEST' }, productLineItem: [{ productId: 'sku', productOfferDetails: { quantity: 1, refundableQuantity: 1, consumptionState: 'CONSUMPTION_STATE_YET_TO_BE_CONSUMED' } }], obfuscatedExternalAccountId: 'account', obfuscatedExternalProfileId: 'profile', purchaseCompletionTime: '2026-09-30T02:00:00Z' }
+  provider.request = async () => data
+  const purchase = await provider.query('test.app', 'sandbox', 'purchasefixture')
+  assert.equal(purchase.payment.transactionKey, createHashForToken('purchasefixture'))
+  assert.equal(purchase.payment.state, 'paid')
+  assert.equal(purchase.payment.amountMinor, null)
+  assert.equal(purchase.payment.currency, null)
+  data.productLineItem[0].productOfferDetails.quantity = 2
+  assert.equal((await provider.query('test.app', 'sandbox', 'purchasefixture')).payment.refundScope, 'partial')
+  data.testPurchaseContext = undefined
+  await assert.rejects(provider.query('test.app', 'sandbox', 'purchasefixture'), /环境/)
+  provider.request = async () => ({ purchaseStateContext: { purchaseState: 'PENDING' } })
+  const pending = await provider.query('test.app', 'sandbox', 'purchasefixture')
+  assert.equal(pending.payment.state, 'pending')
+  assert.equal(pending.payment.paidAt, null)
+  await assert.rejects(provider.notification({ message: { data: 'e30=' } }), /OIDC/)
+})
+
+function createHashForToken(token) {
+  return createHash('sha256').update(token).digest('hex')
+}

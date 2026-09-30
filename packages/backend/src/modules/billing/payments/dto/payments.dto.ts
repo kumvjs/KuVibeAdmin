@@ -34,3 +34,10 @@ export class ReceiptAcceptedDto {
   @ApiProperty({ enum: ['pending', 'done', 'review'] })
   status: string
 }
+
+export class AppleNotificationDto {
+  @IsString()
+  @MaxLength(131072)
+  @Matches(/^[\w-]+\.[\w-]+\.[\w-]+$/)
+  signedPayload: string
+}

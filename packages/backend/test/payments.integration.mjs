@@ -169,6 +169,21 @@ test('首单赠分按入账判定；跨渠道只中一次；预算竞争失败�
   assert.equal(transaction.bonus_points, '0')
 })
 
+test('首单券结算时复核券次数，十人共享限一次券仅一人获赠', async () => {
+  const pkg = await pack()
+  const promo = await promotion(pkg.id, { requiresCoupon: true })
+  const couponCode = code()
+  const coupon = await catalog.createCoupon({ promotionId: promo.id, code: couponCode, totalLimit: '1', startsAt: new Date(Date.now() - 10000).toISOString(), endsAt: new Date(Date.now() + 1800000).toISOString() }, actor.id)
+  const buyers = await Promise.all(Array.from({ length: 10 }, () => user()))
+  const rows = await Promise.all(buyers.map(buyer => orders.create(buyer.id, { packageId: pkg.id, versionId: pkg.versionId, channel: 'wechat', client: 'qr', payableMinor: pkg.priceMinor, idempotencyKey: randomUUID(), couponCode })))
+  await Promise.all(rows.map((row, index) => payments.prepare(buyers[index].id, row.id)))
+  await Promise.all(rows.map(row => settlement.settle(row.id, proof(row))))
+  const balances = await Promise.all(buyers.map(buyer => points.account(buyer.id)))
+  assert.equal(balances.filter(item => item.available === '1600').length, 1)
+  assert.equal(balances.filter(item => item.available === '1100').length, 9)
+  assert.deepEqual((await source.query('SELECT reserved::text,sold::text FROM biz_quota_bucket WHERE resource_key=$1', [`coupon:${coupon.id}:total`]))[0], { reserved: '0', sold: '1' })
+})
+
 test('冻结用户的历史已付订单仍履约；中途失败整体回滚并可原凭据重试', async () => {
   const buyer = await user()
   const pkg = await pack()

@@ -1,6 +1,6 @@
 # 充值套餐与优惠
 
-当前已实现积分账户、套餐运营、订单创建/查询/取消、微信App/Native扫码与支付宝App/扫码适配及统一入账。渠道默认关闭，尚未完成商户沙箱联调；Apple/Google验真继续开发。不能使用报价、客户端支付结果或pending订单作为到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
+当前已实现积分账户、套餐运营、订单创建/查询/取消、四渠道支付验真适配及统一入账。渠道默认关闭，尚未完成真实商户/商店和客户端联调。不能使用报价、客户端支付结果或pending订单作为到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
 
 ## 套餐与版本
 
@@ -50,6 +50,22 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 
 实现依据：[微信App下单](https://pay.wechatpay.cn/doc/v3/merchant/4013070347)、[微信Native下单](https://pay.wechatpay.cn/doc/v3/merchant/4012791877)、[支付宝官方Node SDK](https://github.com/alipay/alipay-sdk-nodejs-all)。上线前仍须完成真实商户权限、回调地址和客户端联调。
 
+## 消耗型内购接入
+
+Apple使用官方App Store Server SDK、在线证书状态检查和可信Apple根证书验证JWS，环境仅允许Sandbox/Production；禁止Xcode/LocalTesting免验证环境。配置bundleId、环境、Issuer/Key ID、服务端私钥和根证书；Production还必须配置正整数`appAppleId`。Google服务账户需要Android Publisher权限，启用对应应用与环境，配置Pub/Sub推送受众URL和精确推送服务账户邮箱。
+
+准备接口直接返回固定SKU与订单绑定：Apple购买时传`appAccountToken`；Google购买时同时传`obfuscatedAccountId`和`obfuscatedProfileId`。用户通过本人订单提交Apple transactionId或Google purchaseToken，服务端先保存查验任务再独立查询商店。Apple核对消耗型、PURCHASED归属、应用、环境、SKU、单件数量和订单token；Google以purchaseToken摘要去重，核对应用/测试环境、SKU、单件数量、用户和订单绑定，不依赖可能缺失的Google orderId。
+
+Apple客户端必须保留未完成交易，仅在本人订单状态`paid`后调用StoreKit finish；服务端消费型Google权益入账后才排队调用consume。Google consume同时完成消费确认，网络失败不会回滚已入账权益，原任务保留重试；客户端不要先consume再等待后端。跨设备重提原订单/原交易使用相同绑定，不允许把旧交易转给另一个站内账号。
+
+Google `PENDING`不发积分、不占首单、不消费确认；正常等待按60秒延迟并重置失败计数，长时间待付款不会因此进入十次失败死信。网络/验真错误仍按故障退避，十次后需要运营处理。商店确认取消可结束尚未入账订单。内购无统一15分钟过期，已下架固定SKU的历史有效订单仍按旧权益履约。
+
+Apple通知通过JWS验真，Google RTDN通过OIDC校验受众、issuer、email_verified及推送服务账户；通知持久化后异步查商店最新状态，凭绑定UUID补单。无可靠归属的历史交易留`review`，不猜测用户。部分退款、多件购买、消费信息请求和不支持的商店事件须人工核查，不能按整单退款或新充值处理；退款扣回闭环仍在后续阶段。
+
+Google purchaseToken及原通知用独立32字节AES-GCM密钥加密，文件存Base64文本，`dataKeyId`标识写入密钥。轮换时用`dataKeys`保留旧ID到文件的映射，使历史凭据仍可读取；AAD绑定渠道与应用。备份必须同时保留数据库和相应密钥，不能把凭据放在日志、URL或outbox明文中。
+
+实现依据：[Apple官方服务端SDK](https://github.com/apple/app-store-server-library-node)、[Google productsv2验真](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.productsv2/getproductpurchasev2)、[Google消费确认](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/consume)、[RTDN通知规则](https://developer.android.com/google/play/billing/rtdn-reference)。真实Apple证书链/OCSP、商店SKU、Google账户权限与RTDN推送均须在实际商店环境验证。
+
 ## 开发验证
 
 使用[Docker开发环境](../guide/docker.md)，创建独立测试库，不在开发业务库执行并发测试：
@@ -60,6 +76,7 @@ node scripts/docker-dev.mjs exec postgres createdb -U ku_vibe_admin kuvibe_billi
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/catalog.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/orders.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/payments.integration.mjs
+node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/iap.integration.mjs
 ```
 
 已创建测试库时跳过createdb；按实际`POSTGRES_USER`替换示例用户名。测试保留本次独立业务记录，使用随机业务标识避免跨次互相干扰。覆盖200并发抢每日20份、预算回滚与消费/释放、版本降额保护、券固定权益、内购映射、首单事实保护及迁移往返/旧数据保留/实体diff。并发测试验证一致性，不代表生产吞吐已验收。

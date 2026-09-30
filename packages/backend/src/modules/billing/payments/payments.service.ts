@@ -1,6 +1,6 @@
 import type { InboxPayload } from './entities/payment-inbox.entity.js'
 import type { PaymentBinding, ProviderPayment } from './payment.types.js'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { DataSource } from 'typeorm'
 import { SysUserEntity } from '#/modules/user/entities/user.entity.js'
@@ -12,15 +12,18 @@ import { BillingOutboxService } from '../orders/outbox.service.js'
 import { positiveInteger } from '../points/points.types.js'
 import { billingTransaction } from '../shared/billing-transaction.js'
 import { AlipayProvider } from './alipay.provider.js'
-import { PaymentAttemptEntity } from './entities/payment-attempt.entity.js'
+import { AppleProvider } from './apple.provider.js'
+import { PaymentAttemptEntity, StoreIdentityEntity } from './entities/payment-attempt.entity.js'
 import { PaymentInboxEntity } from './entities/payment-inbox.entity.js'
+import { GoogleProvider } from './google.provider.js'
+import { PaymentSecretsService } from './payment-secrets.service.js'
 import { ChannelPendingError } from './payment.types.js'
 import { SettlementService } from './settlement.service.js'
 import { WechatProvider } from './wechat.provider.js'
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly source: DataSource, private readonly catalog: CatalogService, private readonly orders: OrdersService, private readonly outbox: BillingOutboxService, private readonly settlement: SettlementService, private readonly wechat: WechatProvider, private readonly alipay: AlipayProvider) {}
+  constructor(private readonly source: DataSource, private readonly catalog: CatalogService, private readonly orders: OrdersService, private readonly outbox: BillingOutboxService, private readonly settlement: SettlementService, private readonly wechat: WechatProvider, private readonly alipay: AlipayProvider, private readonly apple: AppleProvider, private readonly google: GoogleProvider, private readonly secrets: PaymentSecretsService) {}
 
   async prepare(userId: string, id: string) {
     positiveInteger(id, 'orderId')
@@ -32,11 +35,27 @@ export class PaymentsService {
       if (order.status !== 'pending' || expired)
         throw new ConflictException('订单已结束或到期，不能继续发起支付')
       const binding = this.binding(order)
+      const iap = ['apple', 'google'].includes(order.channel)
       let attempt = await manager.getRepository(PaymentAttemptEntity).findOneBy({ orderId: id })
       if (!attempt) {
+        if (iap) {
+          const identities = manager.getRepository(StoreIdentityEntity)
+          await identities.createQueryBuilder().insert().values({ userId, token: randomUUID() }).orIgnore().execute()
+          binding.storeAccountId = (await identities.findOneByOrFail({ userId, tenantId: '1' })).token
+        }
         attempt = await manager.getRepository(PaymentAttemptEntity).save({ orderId: id, binding, storeToken: randomUUID(), status: 'queued' })
-        await this.outbox.enqueue(manager, 'payment_prepare', id, `order:${id}:prepare`)
-        await this.outbox.enqueue(manager, 'payment_poll', id, `order:${id}:poll`, new Date(Date.now() + 10000))
+        if (iap) {
+          const parameters = { productId: order.snapshot.productId!, applicationId: binding.applicationId, environment: binding.environment, ...(order.channel === 'apple' ? { appAccountToken: attempt.storeToken } : { obfuscatedAccountId: binding.storeAccountId!, obfuscatedProfileId: attempt.storeToken }) }
+          await manager.getRepository(PaymentAttemptEntity).update(attempt.id, { status: 'starting' })
+          await manager.getRepository(PaymentAttemptEntity).update(attempt.id, { status: 'ready', parameters })
+          await manager.getRepository(RechargeOrderEntity).update(id, { paymentInitiated: true })
+          attempt.status = 'ready'
+          attempt.parameters = parameters
+        }
+        else {
+          await this.outbox.enqueue(manager, 'payment_prepare', id, `order:${id}:prepare`)
+          await this.outbox.enqueue(manager, 'payment_poll', id, `order:${id}:poll`, new Date(Date.now() + 10000))
+        }
       }
       else {
         this.assertBinding(attempt.binding, binding)
@@ -53,7 +72,8 @@ export class PaymentsService {
   async inbox(channel: ProviderPayment['channel'], hash: string, orderId: string | null, payload: InboxPayload) {
     return billingTransaction(this.source, async (manager) => {
       const repository = manager.getRepository(PaymentInboxEntity)
-      await repository.createQueryBuilder().insert().values({ channel, evidenceHash: hash, orderId, payload, status: orderId ? 'pending' : 'review', reason: orderId ? null : 'unmatched_order' }).orIgnore().execute()
+      const resolvable = orderId || payload.transactionId || payload.secret
+      await repository.createQueryBuilder().insert().values({ channel, evidenceHash: hash, orderId, payload, status: resolvable ? 'pending' : 'review', reason: resolvable ? null : 'unmatched_order' }).orIgnore().execute()
       const row = await repository.findOneByOrFail({ channel, evidenceHash: hash })
       if (row.orderId !== orderId)
         throw new ConflictException('同一支付凭据已绑定其他订单')
@@ -65,11 +85,91 @@ export class PaymentsService {
 
   async processInbox(id: string) {
     const row = await this.source.getRepository(PaymentInboxEntity).findOneByOrFail({ id })
-    if (row.status !== 'pending' || !row.orderId)
+    if (row.status !== 'pending')
       return
-    if (!row.payload.payment)
-      throw new Error('内购验真处理器尚未启用')
-    await this.settlement.settle(row.orderId, row.payload.payment, id)
+    if (row.channel === 'apple' && row.payload.notificationType && !['ONE_TIME_CHARGE', 'REFUND', 'REVOKE'].includes(row.payload.notificationType)) {
+      await this.source.getRepository(PaymentInboxEntity).update(id, { status: 'review', reason: 'store_event_requires_manual_review' })
+      return
+    }
+    let payment = row.payload.payment
+    if (row.channel === 'apple')
+      payment = await this.apple.query(row.payload.applicationId!, row.payload.environment!, row.payload.transactionId!)
+    if (row.channel === 'google') {
+      const token = this.secrets.open(row.payload.secret!, `google:${row.payload.applicationId}`)
+      const hint = row.orderId ? await this.source.getRepository(RechargeOrderEntity).findOneByOrFail({ id: row.orderId }) : null
+      // RTDN没有可靠测试环境字段，依次尝试本地启用的两套环境；验真仍必须匹配服务端testPurchaseContext。
+      if (hint) {
+        payment = (await this.google.query(row.payload.applicationId!, hint.snapshot.environment!, token)).payment
+      }
+      else {
+        let failure: unknown
+        for (const environment of ['production', 'sandbox']) {
+          try {
+            payment = (await this.google.query(row.payload.applicationId!, environment, token)).payment
+            break
+          }
+          catch (error) {
+            failure = error
+          }
+        }
+        if (!payment)
+          throw failure
+      }
+      if (row.payload.refundScope)
+        payment = { ...payment!, state: 'refunded', refundScope: row.payload.refundScope }
+    }
+    if (!payment)
+      throw new Error('通知缺少可验证凭据')
+    if (payment.state === 'pending' && ['apple', 'google'].includes(row.channel))
+      throw new ChannelPendingError('商店待付款，保留任务，不提前入账或消费确认')
+    const uuidBinding = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(payment.bindingToken ?? '')
+    const attempt = !row.orderId && uuidBinding ? await this.source.getRepository(PaymentAttemptEntity).findOneBy({ storeToken: payment.bindingToken! }) : null
+    const orderId = row.orderId ?? attempt?.orderId
+    if (!orderId) {
+      await this.source.getRepository(PaymentInboxEntity).update(id, { status: 'review', reason: 'missing_store_order_binding' })
+      return
+    }
+    await this.settlement.settle(orderId, payment, id)
+  }
+
+  async receipt(userId: string, id: string, input: { transactionId?: string, purchaseToken?: string }) {
+    const order = await this.ownOrder(userId, id)
+    const attempt = await this.source.getRepository(PaymentAttemptEntity).findOneBy({ orderId: id })
+    if (!attempt || attempt.status !== 'ready' || !['apple', 'google'].includes(order.channel))
+      throw new ConflictException('请先获取该内购订单绑定参数')
+    this.assertBinding(attempt.binding, this.binding(order))
+    if (order.channel === 'apple') {
+      if (!/^\d{1,64}$/.test(input.transactionId ?? '') || input.purchaseToken)
+        throw new ConflictException('Apple仅接受transactionId，服务端查单并验签')
+      const hash = createHash('sha256').update(`apple:${id}:${input.transactionId}`).digest('hex')
+      return this.inbox('apple', hash, id, { transactionId: input.transactionId, applicationId: attempt.binding.applicationId, environment: attempt.binding.environment })
+    }
+    if (!/^[\w.:-]{1,4096}$/.test(input.purchaseToken ?? '') || input.transactionId)
+      throw new ConflictException('Google仅接受受限长度的purchaseToken')
+    const hash = createHash('sha256').update(`google:${id}:${input.purchaseToken}`).digest('hex')
+    return this.inbox('google', hash, id, { secret: this.secrets.seal(input.purchaseToken!, `google:${attempt.binding.applicationId}`), applicationId: attempt.binding.applicationId, environment: attempt.binding.environment })
+  }
+
+  async acceptApple(signedPayload: string) {
+    const notification = await this.apple.notification(signedPayload)
+    const transactionId = notification.payment?.transactionKey.split(':').at(-1)
+    return this.inbox('apple', notification.hash, null, { transactionId, applicationId: notification.applicationId, environment: notification.environment, notificationType: notification.type, ...(notification.payment?.refundScope ? { refundScope: notification.payment.refundScope } : {}) })
+  }
+
+  async acceptGoogle(body: unknown, authorization?: string) {
+    const notification = await this.google.notification(body, authorization)
+    return this.inbox('google', notification.hash, null, { applicationId: notification.applicationId, notificationType: notification.type, ...(notification.noticeData ? { notice: this.secrets.seal(notification.noticeData, `google-notification:${notification.applicationId}`) } : {}), ...(notification.token ? { secret: this.secrets.seal(notification.token, `google:${notification.applicationId}`) } : {}), ...(notification.refundScope ? { refundScope: notification.refundScope } : {}) })
+  }
+
+  async consume(id: string) {
+    const inbox = await this.source.getRepository(PaymentInboxEntity).findOneByOrFail({ id })
+    const transaction = await this.source.query('SELECT order_id::text FROM biz_payment_transaction WHERE channel=\'google\' AND inbox_id=$1', [id])
+    if (!transaction.length)
+      throw new ConflictException('Google消费确认必须先持久化入账交易')
+    const order = await this.source.getRepository(RechargeOrderEntity).findOneByOrFail({ id: transaction[0].order_id })
+    if (!order.paidLedgerId)
+      throw new ConflictException('Google尚未持久化积分入账，不能消费确认')
+    await this.google.consume(inbox.payload.applicationId!, order.snapshot.environment!, order.snapshot.productId!, this.secrets.open(inbox.payload.secret!, `google:${inbox.payload.applicationId}`))
   }
 
   async processPrepare(id: string) {
@@ -177,6 +277,14 @@ export class PaymentsService {
       return this.wechat.binding(order.client)
     if (order.channel === 'alipay')
       return this.alipay.binding()
+    if (order.channel === 'apple')
+      return this.apple.binding(order.snapshot.applicationId!, order.snapshot.environment!)
+    if (order.channel === 'google') {
+      // 下发购买绑定前验证凭据可持久化，避免商店已扣款而服务器没有数据密钥。
+      const binding = this.google.binding(order.snapshot.applicationId!, order.snapshot.environment!)
+      this.secrets.seal('', `google:${order.snapshot.applicationId}`)
+      return binding
+    }
     throw new ServiceUnavailableException('内购支付适配尚未启用')
   }
 

@@ -49,4 +49,12 @@ export class BillingOutboxService {
     const result = await this.source.getRepository(BillingOutboxEntity).createQueryBuilder().update().set({ status: lease.attempts >= 10 ? 'dead' : 'pending', leaseToken: null, leasedUntil: null, lastError: safeCode, availableAt: () => `NOW() + INTERVAL '${Math.min(300, 2 ** lease.attempts)} seconds'` }).where('id = :id AND status = :status AND lease_token = :token AND leased_until > NOW()', { id: lease.id, status: 'processing', token: lease.leaseToken }).execute()
     return result.affected === 1
   }
+
+  /** 渠道明确pending属于正常等待，不能计入失败死信，否则长时待付款将失去补偿。 */
+  async defer(lease: OutboxLease, seconds = 60): Promise<boolean> {
+    if (!Number.isInteger(seconds) || seconds < 5 || seconds > 3600)
+      throw new Error('延迟任务必须为5到3600秒')
+    const result = await this.source.getRepository(BillingOutboxEntity).createQueryBuilder().update().set({ status: 'pending', attempts: 0, leaseToken: null, leasedUntil: null, lastError: null, availableAt: () => `NOW() + INTERVAL '${seconds} seconds'` }).where('id=:id AND status=\'processing\' AND lease_token=:token AND leased_until>NOW()', { id: lease.id, token: lease.leaseToken }).execute()
+    return result.affected === 1
+  }
 }

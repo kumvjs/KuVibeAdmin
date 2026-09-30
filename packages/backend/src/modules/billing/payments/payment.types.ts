@@ -24,6 +24,19 @@ export interface ProviderPayment {
 
 export class ChannelPendingError extends Error {}
 
+/** SDK只读调用的上界；超时不得视为未支付、未退款或关单成功。 */
+export async function channelDeadline<T>(request: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([request, new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('channel_timeout')), 8000)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 export function decimalToMinor(value: unknown): string {
   if (typeof value !== 'string' || !/^(?:0|[1-9]\d{0,16})(?:\.\d{1,2})?$/.test(value))
     throw new UnauthorizedException('渠道金额格式无效')

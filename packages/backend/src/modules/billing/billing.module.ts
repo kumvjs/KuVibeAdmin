@@ -8,7 +8,10 @@ import { OrdersController, SystemOrdersController } from './orders/orders.contro
 import { OrdersService } from './orders/orders.service.js'
 import { BillingOutboxService } from './orders/outbox.service.js'
 import { AlipayProvider } from './payments/alipay.provider.js'
+import { AppleProvider } from './payments/apple.provider.js'
+import { GoogleProvider } from './payments/google.provider.js'
 import { PaymentConfigService } from './payments/payment-config.service.js'
+import { PaymentSecretsService } from './payments/payment-secrets.service.js'
 import { PaymentNotificationsController, PaymentsController } from './payments/payments.controller.js'
 import { PaymentsService } from './payments/payments.service.js'
 import { SettlementService } from './payments/settlement.service.js'
@@ -24,7 +27,7 @@ import { PointsService } from './points/points.service.js'
 @Module({
   imports: [TypeOrmModule.forFeature([PointAccountEntity, PointLedgerEntity, PointLotEntity, PointAllocationEntity, PointHoldEntity, PointHoldItemEntity])],
   controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController],
-  providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService],
+  providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService, AppleProvider, GoogleProvider, PaymentSecretsService],
   exports: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService],
 })
 export class BillingModule {}

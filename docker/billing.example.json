@@ -22,6 +22,25 @@
     "publicKeyFile": "alipay-public-key.pem",
     "notifyUrl": "https://your-api.example/api/payments/alipay/notify"
   },
-  "apple": [],
-  "google": []
+  "apple": [
+    {
+      "enabled": false,
+      "bundleId": "com.example.app",
+      "environment": "sandbox",
+      "issuerId": "REPLACE_WITH_ISSUER_UUID",
+      "keyId": "REPLACE_WITH_KEY_ID",
+      "privateKeyFile": "apple-server-key.p8",
+      "rootCertificateFiles": ["AppleRootCA-G3.cer"]
+    }
+  ],
+  "google": [
+    {
+      "enabled": false,
+      "packageName": "com.example.app",
+      "environment": "sandbox",
+      "credentialsFile": "google-service-account.json",
+      "pushAudience": "https://your-api.example/api/payments/google/notify",
+      "pushServiceAccountEmail": "REPLACE_WITH_PUSH_ACCOUNT@your-project.iam.gserviceaccount.com"
+    }
+  ]
 }

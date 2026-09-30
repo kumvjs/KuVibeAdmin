@@ -14,7 +14,8 @@
 | Authorization | User-role-menu RBAC | `sys_user_role`, `sys_role_menu`, `sys_menu` | High |
 | API contract | Swagger/OpenAPI plus global `{ code, data, message, success, traceId }` envelope | common decorators/interceptors | High |
 | Package manager | pnpm 11 workspace-style repository | lockfiles and package manager fields | High |
-| Tests | Jest/Supertest | core manifest and test config | High |
+| Frontend | Vben/Vue 3.5.41、Vite 8.3、Antdv Next、TypeScript 6 | frontend workspace catalog 与 playground | High |
+| Tests | Backend Jest/Supertest；frontend Vitest/happy-dom | backend test config、frontend billing.vitest.config.ts | High |
 | Docs | VitePress Markdown | `docs/package.json`, `.vitepress/config.mts` | High |
 
 ## Required engineering rules
@@ -62,6 +63,7 @@ order: number
 
 ### Docker 部署
 
+- 前端开发镜像使用 Node.js 24 Debian slim、pnpm 11.16.0，按 frontend 独立冻结锁安装；Vite 关闭 Nitro mock，以同源 /api 代理真实后端。金额/积分以字符串传输、BigInt 计算，构建 target=es2020；源码只读挂载、轮询热更新。
 - 后端镜像使用 Node.js 24 Debian slim、pnpm 11.25.0，按 backend 独立锁文件冻结安装，沿用根工作区原生依赖构建许可；编译、生产依赖和运行阶段分离。
 - Compose 固定 PostgreSQL 18.6-bookworm，卷挂 /var/lib/postgresql；Redis 8 开启 AOF，内部服务使用 service DNS，不向宿主机发布数据库/Redis 端口。
 - 根 .env 不进镜像；工具直接调用编译 CLI 保留 NODE_ENV，setup 使用已有注入密钥；HTTP 健康检查使用生产也公开的时区只读接口。见 docs/guide/docker.md。

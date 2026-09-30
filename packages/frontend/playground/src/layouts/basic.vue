@@ -21,6 +21,7 @@ import { openWindow } from '@vben/utils';
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
 import LoginForm from '#/views/_core/authentication/login.vue';
+import PointsBadge from '#/views/billing/points-badge.vue';
 
 const { setMenuList } = useTabbarStore();
 setMenuList([
@@ -245,6 +246,7 @@ onBeforeMount(() => {
     @click-logo="handleClickLogo"
     @logout="handleLogout"
   >
+    <template #header-right-55><PointsBadge /></template>
     <template #user-dropdown>
       <UserDropdown
         :avatar

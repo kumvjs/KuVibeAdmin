@@ -60,7 +60,7 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['Capture', '核销冻结积分', POINT_PERMISSIONS.CAPTURE],
     ['Unfreeze', '解冻积分', POINT_PERMISSIONS.UNFREEZE],
     ['Reverse', '冲正积分', POINT_PERMISSIONS.REVERSE],
-  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Points${suffix}`, parent: 'SystemPoints', authCode, type: MenuType.BUTTON, meta: { title } })),
+  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Points${suffix}`, parent: 'SystemPoints', authCode, ...(suffix === 'Read' ? { path: '/system/points/accounts', component: '/system/points/list', type: MenuType.MENU } : { type: MenuType.BUTTON }), meta: { title } })),
   { name: 'SystemBilling', parent: 'System', path: '/system/billing', type: MenuType.CATALOG, meta: { title: '充值运营', icon: 'lucide:wallet', order: 6 } },
   ...([
     ['CatalogRead', '查看套餐与商品', CATALOG_PERMISSIONS.READ],
@@ -69,8 +69,8 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['PromotionRead', '查看活动', CATALOG_PERMISSIONS.PROMOTION_READ],
     ['PromotionWrite', '编辑活动与发券', CATALOG_PERMISSIONS.PROMOTION_WRITE],
     ['PromotionPublish', '发布活动', CATALOG_PERMISSIONS.PROMOTION_PUBLISH],
-  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Billing${suffix}`, parent: 'SystemBilling', authCode, type: MenuType.BUTTON, meta: { title } })),
-  { name: 'BillingOrderRead', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.READ, type: MenuType.BUTTON, meta: { title: '查看订单' } },
+  ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Billing${suffix}`, parent: 'SystemBilling', authCode, ...(suffix === 'CatalogRead' ? { path: '/system/billing/packages', component: '/system/billing/packages', type: MenuType.MENU } : suffix === 'PromotionRead' ? { path: '/system/billing/promotions', component: '/system/billing/promotions', type: MenuType.MENU } : { type: MenuType.BUTTON }), meta: { title } })),
+  { name: 'BillingOrderRead', parent: 'SystemBilling', path: '/system/billing/orders', component: '/system/billing/orders', authCode: ORDER_PERMISSIONS.READ, type: MenuType.MENU, meta: { title: '订单与账务' } },
   { name: 'BillingOrderRefund', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.REFUND, type: MenuType.BUTTON, meta: { title: '全额退款' } },
   { name: 'BillingOrderReconcile', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.RECONCILE, type: MenuType.BUTTON, meta: { title: '发起对账' } },
   { name: 'BillingRiskResolve', parent: 'SystemBilling', authCode: 'system:billing:risk:resolve', type: MenuType.BUTTON, meta: { title: '人工风险处置' } },
@@ -94,17 +94,25 @@ async function seedMenus(manager: EntityManager): Promise<void> {
     // 兼容旧种子：五项附件权限曾直接挂在 System 下，只调整父级以保留授权关联。
     const moveLegacyAttachment = current && seed.parent === 'SystemAttachment'
       && seed.type === MenuType.BUTTON && current.pid === ids.get('System')
+    // 本次增加Web页面：只升级明确的旧账务只读按钮，保留ID及原角色授权。
+    const promoteBillingRead = current && ['PointsRead', 'BillingCatalogRead', 'BillingPromotionRead', 'BillingOrderRead'].includes(seed.name)
+      && current.type === MenuType.BUTTON && seed.type === MenuType.MENU
+      && current.path === null && current.component === null && current.pid === pid
     if (matches.length > 1 || (current && (
       current.deletedAt || current.status !== MenuStatus.ENABLED
-      || current.name !== seed.name || (current.path ?? null) !== (seed.path ?? null)
+      || current.name !== seed.name || ((current.path ?? null) !== (seed.path ?? null) && !promoteBillingRead)
       || (current.authCode ?? null) !== (seed.authCode ?? null)
-      || current.type !== seed.type || ((current.pid ?? null) !== pid && !moveLegacyAttachment)
-      || (current.component ?? null) !== (seed.component ?? null)
+      || (current.type !== seed.type && !promoteBillingRead) || ((current.pid ?? null) !== pid && !moveLegacyAttachment)
+      || ((current.component ?? null) !== (seed.component ?? null) && !promoteBillingRead)
     ))) {
       throw new Error(`初始化菜单冲突：${seed.name}；请核对已有记录，脚本不会覆盖或恢复它。`)
     }
     if (moveLegacyAttachment)
       await repository.update(current.id, { pid })
+    if (promoteBillingRead) {
+      Object.assign(current, { type: seed.type, path: seed.path, component: seed.component })
+      await repository.save(current)
+    }
     const menu = current ?? await repository.save(repository.create({
       ...fields,
       pid,

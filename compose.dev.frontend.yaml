@@ -1,0 +1,29 @@
+services:
+  frontend:
+    image: kuvibe-admin-frontend:dev
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - '127.0.0.1:5999:5999'
+    environment:
+      VITE_APP_TITLE: KuVibeAdmin
+      VITE_APP_NAMESPACE: kuvibe-admin
+      VITE_GLOB_API_URL: /api
+      VITE_ROUTER_HISTORY: hash
+      VITE_BASE: /
+      VITE_BACKEND_PROXY: http://backend:7001
+    volumes:
+      - ./packages/frontend/playground/src:/workspace/frontend/playground/src:ro
+      - ./packages/frontend/playground/vite.config.ts:/workspace/frontend/playground/vite.config.ts:ro
+      - ./packages/frontend/billing.vitest.config.ts:/workspace/frontend/billing.vitest.config.ts:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:5999/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 12
+    restart: unless-stopped

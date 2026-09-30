@@ -1,6 +1,6 @@
 # 项目概览
 
-KuVibeAdmin 是一个以 NestJS 12 和 Fastify 为 HTTP 运行时的后端基础工程，基于 [KuVibe](https://github.com/kumvjs/KuVibe) 工程协议，面向 AI 辅助开发，为 Vben Admin 管理前端提供认证、用户、权限与系统管理能力。当前正式版交付后端，前端需独立接入。
+KuVibeAdmin 是一个以 NestJS 12 和 Fastify 为 HTTP 运行时的后端基础工程，基于 [KuVibe](https://github.com/kumvjs/KuVibe) 工程协议，面向 AI 辅助开发，为 Vben Admin 管理前端提供认证、用户、权限与系统管理能力。当前正式版交付后端；仓库 `packages/frontend/playground` 已接入真实后端，增加开发中的[积分与充值页面](../frontend/billing.md)。
 
 当前仓库的重点是通用后端底座。AI 模块尚未进入业务开发阶段；系统管理的菜单、部门、角色和用户后端接口已经形成可用闭环。
 

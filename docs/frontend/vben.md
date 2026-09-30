@@ -263,4 +263,4 @@ Playground 保留 `/table/list`、`/demo/bigint` 和 `/status`，只在 local/de
 
 ## 已验证的联调范围
 
-固定 v5.7.0 的浏览器验收、请求适配和可重复命令见[发布验收](../guide/release-verification.md)。本仓库只交付后端；用户表单与日期筛选的前端适配仍由接入方完成。系统管理的 POST 创建接口和认证 POST 默认返回 HTTP 201，上传及时区保存显式返回 200；均遵循 ResOp，Swagger 与实际状态同步。
+固定 v5.7.0 的浏览器验收、请求适配和可重复命令见[发布验收](../guide/release-verification.md)。仓库 `packages/frontend/playground` 的登录、用户列表及新增积分/充值/订单界面已接入真实后端，见[积分与充值前端](billing.md)。既有用户创建表单的 username/password/roleIds 等完整适配仍由接入方完成，本次不将全部演示页面作为已验收的管理功能。系统管理的 POST 创建接口和认证 POST 默认返回 HTTP 201，上传及时区保存显式返回 200；均遵循 ResOp，Swagger 与实际状态同步。

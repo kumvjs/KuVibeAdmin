@@ -13,8 +13,8 @@ export namespace AuthApi {
   }
 
   export interface RefreshTokenResult {
-    data: string;
-    status: number;
+    data: { accessToken: string };
+    success: boolean;
   }
 }
 
@@ -22,18 +22,9 @@ export namespace AuthApi {
  * 登录
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  return requestClient.post<AuthApi.LoginResult>('/auth/login', data, {
-    withCredentials: true,
-  });
-}
-
-/**
- * 刷新accessToken
- */
-export async function refreshTokenApi() {
-  return baseRequestClient.post<AuthApi.RefreshTokenResult>(
-    '/auth/refresh',
-    null,
+  return requestClient.post<AuthApi.LoginResult>(
+    '/auth/login',
+    { username: data.username, password: data.password },
     {
       withCredentials: true,
     },
@@ -41,10 +32,25 @@ export async function refreshTokenApi() {
 }
 
 /**
+ * 刷新accessToken
+ */
+export async function refreshTokenApi() {
+  const response =
+    await baseRequestClient.instance.post<AuthApi.RefreshTokenResult>(
+      '/auth/refresh',
+      null,
+      {
+        withCredentials: true,
+      },
+    );
+  return response.data;
+}
+
+/**
  * 退出登录
  */
 export async function logoutApi() {
-  return baseRequestClient.post('/auth/logout', null, {
+  return requestClient.post('/auth/logout', null, {
     withCredentials: true,
   });
 }

@@ -58,6 +58,8 @@ Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要�
 
 两个API与独立worker的账务并发验证、Linux兼容回归和恢复操作见[账务运维与开发验收](../modules/billing-operations.md)。
 
+`packages/frontend/playground` 的积分、充值与订单页面使用 `compose.dev.frontend.yaml` 加入同一开发项目，入口 `http://localhost:5999`，源码热更新且通过同源 `/api` 访问后端。启动命令和权限说明见[积分与充值前端](../frontend/billing.md)。后续操作包含此前已启动的前端时沿用该覆盖文件，避免将它识别为孤立服务；不要使用 `--remove-orphans` 清理仍在使用的开发服务。
+
 覆盖文件的合并方式参见[Docker Compose文档](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/)，只读源码挂载参见[bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)。
 
 | 配置 | 默认值 / 行为 |

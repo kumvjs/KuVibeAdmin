@@ -142,11 +142,25 @@ export class OrdersService {
   }
 
   async list(userId: string, cursor?: string, limit = 20) {
+    return this.page({ userId }, cursor, limit)
+  }
+
+  async listSystem(filters: { userId?: string, status?: string, channel?: string, merchantNo?: string }, cursor?: string, limit = 20) {
+    if (filters.userId)
+      positiveInteger(filters.userId, 'userId')
+    return this.page(filters, cursor, limit)
+  }
+
+  private async page(filters: { userId?: string, status?: string, channel?: string, merchantNo?: string }, cursor?: string, limit = 20) {
     if (cursor)
       positiveInteger(cursor, 'cursor')
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new UnprocessableEntityException('分页数量必须为1到100')
-    const builder = this.source.getRepository(RechargeOrderEntity).createQueryBuilder('order').where('order.tenantId=1 AND order.userId=:userId', { userId })
+    const builder = this.source.getRepository(RechargeOrderEntity).createQueryBuilder('order').where('order.tenantId=1')
+    for (const key of ['userId', 'status', 'channel', 'merchantNo'] as const) {
+      if (filters[key])
+        builder.andWhere(`order.${key}=:${key}`, { [key]: filters[key] })
+    }
     if (cursor)
       builder.andWhere('order.id < :cursor', { cursor })
     const rows = await builder.orderBy('order.id', 'DESC').take(limit + 1).getMany()

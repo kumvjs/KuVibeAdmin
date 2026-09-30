@@ -7,6 +7,7 @@ import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { SystemDeptApi, SystemUserApi } from '#/api';
 
 import { onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { Page, Tree, useVbenDrawer } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
@@ -35,6 +36,7 @@ const userSearchCodec = createDateRangeCodec<UserSearchFormValues>()({
 type UserSearchSubmitValues = ReturnType<typeof userSearchCodec.encode>;
 
 const deptList = ref<SystemDeptApi.SystemDept[]>([]);
+const router = useRouter();
 const inputSearchValue = ref('');
 const selectedDeptId = ref<string>('');
 
@@ -228,6 +230,16 @@ watch(inputSearchValue, (value) => {
           <template #action="{ row }">
             <VbenTableAction
               :actions="[
+                {
+                  text: '积分账户',
+                  icon: 'lucide:coins',
+                  auth: ['system:points:read'],
+                  onClick: () =>
+                    router.push({
+                      path: '/system/points/accounts',
+                      query: { userId: row.id },
+                    }),
+                },
                 {
                   text: $t('common.detail'),
                   icon: 'lucide:eye',

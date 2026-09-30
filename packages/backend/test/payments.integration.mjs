@@ -98,6 +98,25 @@ test('默认未配置渠道不可发起支付，不写尝试/任务、不改变�
   await orders.cancel(buyer.id, row.id)
 })
 
+test('管理订单按用户/状态/渠道/商户号筛选并分页，本人查询保持隔离', async () => {
+  const [buyer, other] = await Promise.all([user(), user()])
+  const pkg = await pack()
+  const first = await order(buyer, pkg, 'wechat')
+  await orders.cancel(buyer.id, first.id)
+  const second = await order(buyer, pkg, 'alipay')
+  const foreign = await order(other, pkg, 'wechat')
+  const page = await orders.listSystem({ userId: buyer.id }, undefined, 1)
+  assert.deepEqual(page.items.map(row => row.id), [second.id])
+  assert.ok(page.nextCursor)
+  assert.deepEqual((await orders.listSystem({ userId: buyer.id }, page.nextCursor, 1)).items.map(row => row.id), [first.id])
+  assert.deepEqual((await orders.listSystem({ userId: buyer.id, channel: 'wechat', status: 'closed', merchantNo: first.merchantNo })).items.map(row => row.id), [first.id])
+  assert.deepEqual((await orders.listSystem({ userId: buyer.id, merchantNo: foreign.merchantNo })).items, [])
+  assert.deepEqual((await orders.list(buyer.id)).items.map(row => row.id), [second.id, first.id])
+  await assert.rejects(orders.get(buyer.id, foreign.id), /不存在/)
+  await orders.cancel(buyer.id, second.id)
+  await orders.cancel(other.id, foreign.id)
+})
+
 test('100次并发同一真实结算事务只发一份权益、两条流水和一次首单/库存核销', async () => {
   const buyer = await user()
   const pkg = await pack({ dailyLimit: '1' })

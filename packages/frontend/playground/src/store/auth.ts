@@ -84,7 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggingOut.value = true; // 设置 标识
 
     try {
-      await logoutApi();
+      // 刷新失败的重新认证已清除token，避免登出请求再次进入刷新等待队列。
+      if (accessStore.accessToken) await logoutApi();
     } catch {
       // 不做任何处理
     } finally {

@@ -1,0 +1,56 @@
+# 积分与充值前端
+
+本仓库的实际接入入口为 `packages/frontend/playground`，沿用 Vue/Vben、Antdv Next、原有登录与管理布局。它连接真实 NestJS 接口，关闭 Nitro mock；其他演示应用不随本次改动切换。
+
+## 开发环境
+
+先按 [Docker 开发环境](../guide/docker.md#源码热更新开发环境)完成后端迁移及交互 `setup`，再在仓库根运行：
+
+```bash
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build frontend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait frontend
+```
+
+打开 `http://localhost:5999`，使用自己通过 `setup` 创建的管理员账户。没有内置演示账户或默认密码。前端服务以普通 `node` 用户运行，依赖保留在 Linux 镜像中；源码、Vite 配置和测试配置只读挂载，轮询监听适配 Windows。新增依赖时重新构建镜像，日常修改源码自动刷新。
+
+Docker 的 `/api` 代理访问 `http://backend:7001`；宿主运行时默认代理 `http://127.0.0.1:17001`。宿主开发须先在 `packages/frontend` 冻结安装其独立锁文件，复制 `playground/.env.example` 为 `playground/.env`，再执行 `pnpm dev:play`。后端使用自己的锁文件，不能混用宿主与容器依赖。
+
+首次构建从官方 npm registry 下载，BuildKit 缓存保留下载内容；特殊网络环境可通过构建参数 `NPM_REGISTRY` 指定源，不修改锁文件。真实密钥和本地 `.env` 不进入镜像，示例配置仅含公开的 Vite 设置。
+
+已有数据库升级后运行交互 `setup` 补齐菜单。初始化将四个旧只读按钮原地升级为管理页面，保留 ID、自定义元数据和角色关联；发现其他冲突仍拒绝覆盖。本人页面由应用提供给所有已登录用户，不需要授予任何系统管理权限。
+
+## 页面与权限
+
+| 页面 | 功能与边界 |
+| --- | --- |
+| `/account/points` 我的积分 | 可用/冻结余额、受限状态、不可变流水、游标加载；顶栏余额及充值快捷入口 |
+| `/account/recharge` 充值中心 | 已发布套餐、限量和用户限购、微信/支付宝、券码、服务端报价确认与扫码入口 |
+| `/account/orders` 历史订单 | 本人订单分页、权益快照与实际结算、继续查询/付款、取消待付款订单 |
+| `/system/points/accounts` 积分管理 | 按用户查询账户与流水；增加、扣减、冻结、核销、解冻、冲正分别对应独立权限 |
+| `/system/billing/packages` 充值套餐 | 创建、版本修改、上架/下架、总/日/用户限量、销售窗口、Apple/Google 固定 SKU 映射 |
+| `/system/billing/promotions` 优惠活动与券 | 首单、每日首单、满额优惠、折扣、赠分、预算、渠道和套餐范围、发券与定向用户 |
+| `/system/billing/orders` 订单与账务 | 按用户/渠道/状态/商户号筛选；全额退款、对账、差异报告与独立权限的风险处置 |
+
+管理菜单来自后端角色授权，按钮检查对应权限码，接口仍独立鉴权。用户列表新增“积分账户”入口，携带字符串用户 ID。本人接口从 JWT 获取用户，不能通过查询参数查询他人账务。积分“删除”通过扣减或冲正完成，不提供删除流水或手工标记支付成功入口。
+
+## 付款与重试
+
+创建订单前重新确认服务端报价及版本。预计赠分包含保底赠分，两者不重复相加；历史订单显示不可变入账证据，退款后不会把历史发放量当作当前余额。所有账务 ID、金额、积分和额度均保持字符串，金额通过 `BigInt` 转换元/分，不使用浮点计算。
+
+微信/支付宝网页只请求扫码支付。二维码由后端返回；自动查询每 3 秒一次，约 60 秒暂停，手动刷新仍操作原订单。查询报错、页面关闭和渠道未知均不代表支付成功；积分到账只以服务端订单结果为准。取消已发起的支付可能进入“关闭确认中”，库存释放由服务端确认后执行。
+
+请求未得到明确成功响应时，相同用户、内容与操作复用保存在 `sessionStorage` 的幂等键，存储不含令牌或支付凭据。明确创建订单后保存返回的订单 ID，付款继续查该订单；服务端继续保证同用户待付现金订单互斥。提交期间禁止重复操作，报错保留表单与原订单供查询。跨页可从历史订单恢复。
+
+Apple/Google 在网页提供固定商品映射和历史权益展示，付款与恢复交易需要对应原生 App；网页不发起商店购买，不伪造商店现金优惠。首单按成功充值入账判定，退款不恢复资格；每日限量按北京时间，输入销售/活动时间按设备当地时间转为 UTC。
+
+四渠道配置默认关闭。未配置渠道返回明确错误，页面保留订单供查询或取消。真实扫码、商店购买、退款及真实通知仍需商户/商店配置联调；开发环境页面验收不等于渠道上线验收。后端边界见 [充值业务](../modules/recharge.md)和 [账务运维](../modules/billing-operations.md)。
+
+## 验证命令
+
+```bash
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec frontend pnpm typecheck
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec --workdir /workspace/frontend frontend pnpm exec vitest run --config billing.vitest.config.ts
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml exec frontend pnpm build
+```
+
+生产构建使用同源 `/api`，部署时须由 HTTPS 反向代理转发到后端并沿用其安全 Cookie/CORS 配置。开发 Vite 代理和 Docker 热更新服务不代替生产静态站点部署。

@@ -65,7 +65,8 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   async function doRefreshToken() {
     const accessStore = useAccessStore();
     const resp = await refreshTokenApi();
-    const newToken = resp.data;
+    const newToken = resp.data.accessToken;
+    if (!resp.success || !newToken) throw new Error('刷新登录状态失败');
     accessStore.setAccessToken(newToken);
     return newToken;
   }
@@ -95,15 +96,20 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   );
 
   // token过期的处理
-  client.addResponseInterceptor(
-    authenticateResponseInterceptor({
-      client,
-      doReAuthenticate,
-      doRefreshToken,
-      enableRefreshToken: preferences.app.enableRefreshToken,
-      formatToken,
-    }),
-  );
+  const authentication = authenticateResponseInterceptor({
+    client,
+    doReAuthenticate,
+    doRefreshToken,
+    enableRefreshToken: preferences.app.enableRefreshToken,
+    formatToken,
+  });
+  client.addResponseInterceptor({
+    ...authentication,
+    rejected: (error) =>
+      error.config?.url === '/auth/login'
+        ? Promise.reject(error)
+        : authentication.rejected?.(error),
+  });
 
   // 通用的错误处理,如果没有进入上面的错误处理逻辑，就会进入这里
   client.addResponseInterceptor(

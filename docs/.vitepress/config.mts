@@ -51,6 +51,7 @@ export default defineConfig({
         text: '集成与参考',
         items: [
           { text: 'Vben Admin 对接', link: '/frontend/vben' },
+          { text: '积分与充值前端', link: '/frontend/billing' },
           { text: 'HTTP API', link: '/reference/api' },
           { text: '内置公共能力', link: '/reference/common' },
         ],

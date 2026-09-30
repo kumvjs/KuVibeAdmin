@@ -46,6 +46,14 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     await source.getRepository(SysUserEntity).save(user)
     await userRoles.save({ userId: user.id, roleId: ordinary.id })
     const other = await roles.save({ code: 'custom-admin', name: '自定义管理员', status: 1, isDefault: false })
+    // 四项旧只读按钮原地升级成页面，保留既有角色关联与稳定 ID。
+    const billingRoutes = await Promise.all(['PointsRead', 'BillingCatalogRead', 'BillingPromotionRead', 'BillingOrderRead'].map(name => menus.findOneByOrFail({ name })))
+    for (const route of billingRoutes) {
+      assert.equal(route.type, 'menu')
+      assert.ok(route.path && route.component)
+      await menus.update(route.id, { type: 'button', path: null, component: null })
+      await links.save({ roleId: other.id, menuId: route.id })
+    }
     const attachment = await menus.findOneByOrFail({ authCode: 'system:attachment:read' })
     const system = await menus.findOneByOrFail({ name: 'System' })
     const attachmentGroup = await menus.findOneByOrFail({ name: 'SystemAttachment' })
@@ -66,6 +74,15 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
       { roleId: other.id, menuId: attachment.id },
     ])
     const repaired = await initializeBaseData(source)
+    for (const route of billingRoutes) {
+      const upgraded = await menus.findOneByOrFail({ id: route.id })
+      assert.equal(upgraded.type, 'menu')
+      assert.equal(upgraded.path, route.path)
+      assert.equal(upgraded.component, route.component)
+      assert.equal(upgraded.authCode, route.authCode)
+      assert.deepEqual(upgraded.meta, route.meta)
+      assert.equal(await links.countBy({ roleId: other.id, menuId: route.id }), 1)
+    }
     assert.deepEqual(repaired.affectedUserIds, [user.id])
     assert.equal(repaired.rootDeptId, root.id)
     const upgradedGroup = await menus.findOneByOrFail({ name: 'SystemAttachment' })
@@ -78,7 +95,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     assert.equal(await source.getRepository(SysDeptEntity).count(), 1)
     assert.equal(await roles.count(), 2)
     assert.deepEqual((await links.findBy({ roleId: ordinary.id })).map(link => link.menuId), [business.id])
-    assert.equal(await links.countBy({ roleId: other.id }), 1)
+    assert.equal(await links.countBy({ roleId: other.id }), 5)
     assert.deepEqual((await menus.findOneByOrFail({ id: dept.id })).meta, { title: '我的部门', order: 42 })
     const runtime = new MenuService(menus, new UserRoleService(userRoles), {})
     assert.deepEqual(await runtime.getPermissionsByUserId(user.id), ['business:order:read'])

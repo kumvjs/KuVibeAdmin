@@ -4,7 +4,7 @@
 
 KuVibeAdmin 原名 Nest AI Boot。项目基于 [KuVibe](https://github.com/kumvjs/KuVibe) 工程协议，通过项目上下文、需求分析、验证、文档和工程记录，让你与 AI 在统一约定下持续开发。
 
-复用成熟的后台界面与认证权限，让 AI 专注业务差异。项目采用 NestJS + Vben 的协作方向；**当前正式版仅交付后端，不包含 Vben 前端应用**。前端按固定版本契约独立接入。
+复用成熟的后台界面与认证权限，让 AI 专注业务差异。项目采用 NestJS + Vben 的协作方向；当前正式版交付后端，仓库的 `packages/frontend/playground` 已接入真实后端并提供开发中的积分、充值与订单界面。启动方式见[积分与充值前端](docs/frontend/billing.md)。
 
 ## 当前能力
 

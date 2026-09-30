@@ -5,7 +5,7 @@ import { CurrentUser } from '#/common/decorators/current-user.decorator.js'
 import { ApiSecurityAuth } from '#/common/decorators/swagger.decorator.js'
 import { RequirePermissions } from '#/modules/auth/decorators/index.js'
 import { BillingIdDto } from '../catalog/dto/catalog.dto.js'
-import { OrderCreateDto, OrderListQueryDto, OrderPageDto, OrderResponseDto } from './dto/orders.dto.js'
+import { OrderCreateDto, OrderListQueryDto, OrderPageDto, OrderResponseDto, SystemOrderListQueryDto } from './dto/orders.dto.js'
 import { ORDER_PERMISSIONS } from './order.types.js'
 import { OrdersService } from './orders.service.js'
 
@@ -51,6 +51,14 @@ export class OrdersController {
 @ApiSecurityAuth()
 export class SystemOrdersController {
   constructor(private readonly orders: OrdersService) {}
+
+  @Get()
+  @RequirePermissions(ORDER_PERMISSIONS.READ)
+  @ApiOperation({ summary: '管理端按用户、状态、渠道、商户号游标查询订单' })
+  @ApiResult({ type: OrderPageDto })
+  list(@Query() query: SystemOrderListQueryDto) {
+    return this.orders.listSystem(query, query.cursor, query.limit)
+  }
 
   @Get(':id')
   @RequirePermissions(ORDER_PERMISSIONS.READ)

@@ -44,6 +44,28 @@ export class OrderCreateDto {
 
 export class OrderListQueryDto extends PointLedgerQueryDto {}
 
+export class SystemOrderListQueryDto extends OrderListQueryDto {
+  @ApiPropertyOptional({ type: String })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Matches(/^[1-9]\d{0,18}$/)
+  userId?: string
+
+  @ApiPropertyOptional({ enum: ['pending', 'closing', 'closed', 'paid', 'refund_pending', 'refunded', 'review'] })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['pending', 'closing', 'closed', 'paid', 'refund_pending', 'refunded', 'review'])
+  status?: string
+
+  @ApiPropertyOptional({ enum: PAYMENT_CHANNELS })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(PAYMENT_CHANNELS)
+  channel?: PaymentChannel
+
+  @ApiPropertyOptional({ description: '精确查询商户订单号' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Matches(/^[a-f0-9]{32}$/)
+  merchantNo?: string
+}
+
 export class OrderSettlementDto {
   @ApiProperty({ type: String }) paidLedgerId: string
   @ApiProperty({ type: String, nullable: true }) giftLedgerId: string | null

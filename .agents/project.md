@@ -4,7 +4,7 @@
 
 ## Product
 
-KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。当前仅交付后端，Vben 前端独立接入；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
+KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅助开发的 NestJS 管理系统后端。后端与仓库内 Vben playground 已接入真实积分/充值业务，其他前端示例仍独立；AI Agents 业务能力仍在规划。仓库为 https://github.com/kumvjs/KuVibeAdmin。
 
 ## Users and domain
 
@@ -15,6 +15,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 ## Repository shape
 
 - `packages/backend`: NestJS application and database migrations.
+- `packages/frontend/playground`: 真实登录、现有用户列表与积分/充值/订单页面，沿用 Vben 布局及后端菜单权限；其他上游示例应用保持原配置。
 - `packages/backend/src/modules/auth`: login, refresh, logout, token lifecycle.
 - `packages/backend/src/modules/user`: current-user data and user-role relationships.
 - `packages/backend/src/modules/system`: system users, roles, menus, and logs.
@@ -43,6 +44,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 - 撤销此前“开发期默认延后递增”的 Agent 推断：缺少发布脚本、CHANGELOG 及历史递增记录不能证明存在延后政策。仅明确用户决定、发布政策或实际生效的自动化及其递增触发条件可支持 deferred；旧工程笔记保留作历史，不作为例外依据。
 - 固定统一版本：以根 `package.json` 为发布权威，`packages/backend/package.json` 同步相同版本；依据为用户在 2026-09-17 本次刷新中明确选择“统一版本：根目录与 core 同步递增”。按整个完成需求的最高语义影响递增一次，不按包分别重复递增；`docs/package.json` 继续无版本。
 - 每个完整需求通过实现、验收、审查和文档检查后，仅评估一次版本影响；按 `kuVibe.md` §30.1 记录需求标识、基线、目标、语义/有效影响及版本来源，重试沿用原决定。范围明确且无有效例外时实际递增，同步相关清单、内部依赖、锁文件和 CHANGELOG；总结必须报告影响、结果、旧版本 → 新版本及原因。
+- 前端为引入的 Vben monorepo，`packages/frontend/package.json` 5.7.0 与 `playground/package.json` 5.8.0 在引入提交 `8803343` 已并存，名称分别为 vben-admin-monorepo/@vben/playground。上述上游包标识不属于根/backend 统一产品版本来源，当前接入未改变其版本或依赖清单；后续若调整前端发布边界，须先形成明确约定。
 - KuVibe 安装版本独立保存在 `.agents/kuvibe.yaml`，仅在采用、刷新或迁移协议时更新；版本变更不授权提交、打标签或发布。
 
 ## 交付与验收入口
@@ -51,5 +53,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 
 ## Docker 运行
+
+开发前端使用 compose.dev.frontend.yaml 叠加原开发环境，普通 node 用户、回环端口5999、只读热更新挂载、同源 /api 代理；独立 pnpm 锁文件与镜像依赖隔离。启动与边界见 docs/frontend/billing.md。
 
 根 Dockerfile 与 compose.yaml 提供后端、PostgreSQL 18.6-bookworm 和 Redis 8；使用 PostgreSQL 18 的 /var/lib/postgresql 数据卷布局。根 .env 独立保存容器配置和随机密钥，scripts/docker-init.mjs 不覆盖已有文件；迁移和 setup 显式运行，后端 node 普通用户，数据库/Redis/附件/公开资源分别持久化。Docker 本地默认 local，生产必须按 docs/guide/docker.md 配置 HTTPS/CORS/Secure Cookie。新增 1790744400000 迁移补齐 CommonEntity 已预留的 tenant_id，非 1 数据时拒绝回滚；不提供租户隔离能力。

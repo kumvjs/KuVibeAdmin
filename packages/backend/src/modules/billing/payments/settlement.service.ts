@@ -16,6 +16,7 @@ import { OrdersService } from '../orders/orders.service.js'
 import { BillingOutboxService } from '../orders/outbox.service.js'
 import { PointsService } from '../points/points.service.js'
 import { PG_BIGINT_MAX } from '../points/points.types.js'
+import { RefundsService } from '../refunds/refunds.service.js'
 import { billingTransaction } from '../shared/billing-transaction.js'
 import { PaymentAttemptEntity } from './entities/payment-attempt.entity.js'
 import { PaymentInboxEntity } from './entities/payment-inbox.entity.js'
@@ -24,7 +25,7 @@ import { PaymentTransactionEntity } from './entities/payment-transaction.entity.
 /** 仅接受适配器验真后的事实，不提供可直接指定paid的HTTP接口。 */
 @Injectable()
 export class SettlementService {
-  constructor(private readonly source: DataSource, private readonly catalog: CatalogService, private readonly orders: OrdersService, private readonly quotas: QuotaService, private readonly points: PointsService, private readonly outbox: BillingOutboxService) {}
+  constructor(private readonly source: DataSource, private readonly catalog: CatalogService, private readonly orders: OrdersService, private readonly quotas: QuotaService, private readonly points: PointsService, private readonly outbox: BillingOutboxService, private readonly refunds?: RefundsService) {}
 
   async settle(id: string, payment: ProviderPayment, inboxId: string | null = null) {
     const hint = await this.source.getRepository(RechargeOrderEntity).findOneByOrFail({ id, tenantId: '1' })
@@ -39,7 +40,13 @@ export class SettlementService {
       }
       if (payment.state !== 'paid') {
         if (payment.state === 'refunded') {
+          if (this.refunds)
+            return this.refunds.recover(manager, order, payment, inboxId)
           await this.review(manager, order, inboxId, 'verified_refund_requires_recovery')
+          return { status: 'review' }
+        }
+        if (payment.state === 'closed' && order.paidLedgerId) {
+          await this.review(manager, order, inboxId, 'closed_paid_transaction_requires_refund_proof')
           return { status: 'review' }
         }
         if (payment.state === 'closed' && ['apple', 'google'].includes(order.channel) && order.status === 'pending') {

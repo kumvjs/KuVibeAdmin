@@ -1,4 +1,5 @@
 import type { RechargeOrderEntity } from '../orders/entities/recharge-order.entity.js'
+import type { ProviderRefund } from '../refunds/refund.types.js'
 import type { PaymentBinding, ProviderPayment } from './payment.types.js'
 import { createDecipheriv, createHash, randomBytes, sign, verify } from 'node:crypto'
 import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
@@ -66,11 +67,39 @@ export class WechatProvider {
     await this.request('POST', `/v3/pay/transactions/out-trade-no/${encodeURIComponent(merchantNo)}/close`, { mchid: settings.merchantId })
   }
 
+  async refund(order: RechargeOrderEntity, refundNo: string, reason: string) {
+    await this.request('POST', '/v3/refund/domestic/refunds', { out_trade_no: order.merchantNo, out_refund_no: refundNo, reason: Array.from(reason).slice(0, 80).join(''), amount: { refund: channelRequestAmount(order.payableMinor!), total: channelRequestAmount(order.payableMinor!), currency: 'CNY' } })
+  }
+
+  async refundQuery(refundNo: string): Promise<ProviderRefund> {
+    const settings = this.config.require(this.config.settings.wechat)
+    const data = await this.request('GET', `/v3/refund/domestic/refunds/${encodeURIComponent(refundNo)}`)
+    if (typeof data.out_trade_no !== 'string' || typeof data.transaction_id !== 'string' || data.out_refund_no !== refundNo || typeof data.refund_id !== 'string' || data.amount?.currency !== 'CNY')
+      throw new UnauthorizedException('微信退款身份、编号或币种无效')
+    const states: Record<string, ProviderRefund['state']> = { SUCCESS: 'succeeded', CLOSED: 'closed', PROCESSING: 'processing', ABNORMAL: 'review' }
+    if (!states[data.status])
+      throw new UnauthorizedException('微信退款状态无效')
+    return { channel: 'wechat', merchantId: settings.merchantId, environment: 'production', merchantNo: data.out_trade_no, transactionKey: data.transaction_id, refundNo, refundKey: data.refund_id, originalMinor: safeChannelInteger(data.amount.total, '原订单金额'), refundMinor: safeChannelInteger(data.amount.refund, '退款金额'), currency: 'CNY', state: states[data.status], evidenceHash: createHash('sha256').update(JSON.stringify(data)).digest('hex') }
+  }
+
   notification(body: Buffer, headers: Record<string, string | string[] | undefined>): ProviderPayment {
+    return this.transaction(this.decryptNotification(body, headers, ['TRANSACTION.SUCCESS']), createHash('sha256').update(body).digest('hex'))
+  }
+
+  refundNotification(body: Buffer, headers: Record<string, string | string[] | undefined>) {
+    const data = this.decryptNotification(body, headers, ['REFUND.SUCCESS', 'REFUND.CLOSED', 'REFUND.ABNORMAL'])
+    const settings = this.config.require(this.config.settings.wechat)
+    if (data.mchid !== settings.merchantId || typeof data.out_trade_no !== 'string' || !/^[\w-]{1,64}$/.test(data.out_refund_no))
+      throw new UnauthorizedException('微信退款通知商户或编号无效')
+    // 回调只提供已认证查单线索；成功与金额由后续签名退款查询确认。
+    return { merchantNo: data.out_trade_no as string, refundNo: data.out_refund_no as string, evidenceHash: createHash('sha256').update(body).digest('hex') }
+  }
+
+  private decryptNotification(body: Buffer, headers: Record<string, string | string[] | undefined>, events: string[]) {
     const settings = this.config.require(this.config.settings.wechat)
     this.verify(body.toString('utf8'), headers)
     const envelope = JSON.parse(body.toString('utf8'))
-    if (envelope.resource?.algorithm !== 'AEAD_AES_256_GCM' || envelope.event_type !== 'TRANSACTION.SUCCESS')
+    if (envelope.resource?.algorithm !== 'AEAD_AES_256_GCM' || !events.includes(envelope.event_type))
       throw new UnauthorizedException('暂不接受该微信通知类型')
     const key = this.config.file(settings.apiV3KeyFile).toString('utf8').trim()
     if (Buffer.byteLength(key) !== 32)
@@ -89,7 +118,7 @@ export class WechatProvider {
     catch {
       throw new UnauthorizedException('微信通知解密失败')
     }
-    return this.transaction(data, createHash('sha256').update(body).digest('hex'))
+    return data
   }
 
   private transaction(data: Record<string, any>, evidenceHash: string): ProviderPayment {

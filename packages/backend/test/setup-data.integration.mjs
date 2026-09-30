@@ -34,8 +34,8 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     const ordinary = await roles.findOneByOrFail({ code: 'user' })
     assert.equal(ordinary.isDefault, true)
     assert.equal(await links.count(), 0)
-    assert.equal(await menus.count(), 39)
-    assert.equal((await menus.find()).filter(menu => menu.authCode).length, 35)
+    assert.equal(await menus.count(), 42)
+    assert.equal((await menus.find()).filter(menu => menu.authCode).length, 38)
     const root = await source.getRepository(SysDeptEntity).findOneByOrFail({ id: result.rootDeptId })
     assert.equal(root.pid, null)
     const dept = await menus.findOneByOrFail({ name: 'SystemDept' })
@@ -74,7 +74,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
       assert.equal(upgraded.pid, upgradedGroup.id)
       assert.deepEqual(upgraded.meta, permission.meta)
     }
-    assert.equal(await menus.count(), 40)
+    assert.equal(await menus.count(), 43)
     assert.equal(await source.getRepository(SysDeptEntity).count(), 1)
     assert.equal(await roles.count(), 2)
     assert.deepEqual((await links.findBy({ roleId: ordinary.id })).map(link => link.menuId), [business.id])
@@ -90,7 +90,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     assert.equal(routes[0].children.length, 7)
     assert.ok((await runtime.getPermissionsByUserId(user.id)).includes('system:attachment:read'))
     await initializeBaseData(source)
-    assert.equal(await menus.count(), 40)
+    assert.equal(await menus.count(), 43)
 
     // 非旧版根目录归属不应被覆盖。
     await menus.update(attachment.id, { pid: dept.id })

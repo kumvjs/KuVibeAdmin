@@ -1,4 +1,5 @@
 import type { RechargeOrderEntity } from '../orders/entities/recharge-order.entity.js'
+import type { ProviderRefund } from '../refunds/refund.types.js'
 import type { PaymentBinding, ProviderPayment } from './payment.types.js'
 import { createHash } from 'node:crypto'
 import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
@@ -47,6 +48,25 @@ export class AlipayProvider {
     const result = await this.execute('alipay.trade.close', { bizContent: { out_trade_no: merchantNo } })
     if (result.code !== '10000')
       throw new ServiceUnavailableException('支付宝未确认关单，保留预占并重试查单')
+  }
+
+  async refund(order: RechargeOrderEntity, refundNo: string, reason: string) {
+    const result = await this.execute('alipay.trade.refund', { bizContent: { out_trade_no: order.merchantNo, out_request_no: refundNo, refund_amount: minorToDecimal(order.payableMinor!), refund_reason: Array.from(reason).slice(0, 256).join('') } })
+    if (result.code !== '10000')
+      throw new ServiceUnavailableException('支付宝退款申请结果未知，保留冻结并以原退款编号查单')
+  }
+
+  async refundQuery(refundNo: string, merchantNo: string): Promise<ProviderRefund> {
+    const settings = this.config.require(this.config.settings.alipay)
+    const data = await this.execute('alipay.trade.fastpay.refund.query', { bizContent: { out_trade_no: merchantNo, out_request_no: refundNo } })
+    if (data.code !== '10000')
+      throw new ServiceUnavailableException('支付宝退款查单结果未知，保留冻结')
+    if (data.out_trade_no !== merchantNo || data.out_request_no !== refundNo || typeof data.trade_no !== 'string' || (data.app_id && data.app_id !== settings.appId) || (data.seller_id && data.seller_id !== settings.sellerId))
+      throw new UnauthorizedException('支付宝退款身份或编号不匹配')
+    // 接口成功不等于退款成功；仅明确REFUND_SUCCESS才允许扣回冻结权益。
+    if (data.refund_status !== 'REFUND_SUCCESS')
+      throw new ServiceUnavailableException('支付宝未确认退款成功，继续原编号重试和查单')
+    return { channel: 'alipay', merchantId: settings.sellerId, environment: settings.environment, merchantNo, transactionKey: data.trade_no, refundNo, refundKey: refundNo, originalMinor: decimalToMinor(data.total_amount), refundMinor: decimalToMinor(data.refund_amount), currency: 'CNY', state: 'succeeded', evidenceHash: createHash('sha256').update(JSON.stringify(data)).digest('hex') }
   }
 
   notification(raw: Buffer): ProviderPayment {

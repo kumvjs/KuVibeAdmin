@@ -15,6 +15,7 @@ export interface InboxPayload {
   environment?: 'sandbox' | 'production'
   notificationType?: string
   refundScope?: 'full' | 'partial'
+  refundNo?: string
 }
 
 @Entity('biz_payment_inbox')

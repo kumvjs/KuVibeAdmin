@@ -23,11 +23,14 @@ import { PointLedgerEntity } from './points/entities/point-ledger.entity.js'
 import { PointLotEntity } from './points/entities/point-lot.entity.js'
 import { PointsController, SystemPointsController } from './points/points.controller.js'
 import { PointsService } from './points/points.service.js'
+import { ReconciliationService } from './refunds/reconciliation.service.js'
+import { BillingRisksController, RefundsController } from './refunds/refunds.controller.js'
+import { RefundsService } from './refunds/refunds.service.js'
 
 @Module({
   imports: [TypeOrmModule.forFeature([PointAccountEntity, PointLedgerEntity, PointLotEntity, PointAllocationEntity, PointHoldEntity, PointHoldItemEntity])],
-  controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController],
-  providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService, AppleProvider, GoogleProvider, PaymentSecretsService],
+  controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController, RefundsController, BillingRisksController],
+  providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService, AppleProvider, GoogleProvider, PaymentSecretsService, RefundsService, ReconciliationService],
   exports: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService],
 })
 export class BillingModule {}

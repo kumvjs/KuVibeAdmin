@@ -71,6 +71,9 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ['PromotionPublish', '发布活动', CATALOG_PERMISSIONS.PROMOTION_PUBLISH],
   ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `Billing${suffix}`, parent: 'SystemBilling', authCode, type: MenuType.BUTTON, meta: { title } })),
   { name: 'BillingOrderRead', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.READ, type: MenuType.BUTTON, meta: { title: '查看订单' } },
+  { name: 'BillingOrderRefund', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.REFUND, type: MenuType.BUTTON, meta: { title: '全额退款' } },
+  { name: 'BillingOrderReconcile', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.RECONCILE, type: MenuType.BUTTON, meta: { title: '发起对账' } },
+  { name: 'BillingRiskResolve', parent: 'SystemBilling', authCode: 'system:billing:risk:resolve', type: MenuType.BUTTON, meta: { title: '人工风险处置' } },
 ]
 
 async function seedMenus(manager: EntityManager): Promise<void> {

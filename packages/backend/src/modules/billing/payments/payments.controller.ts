@@ -57,6 +57,15 @@ export class PaymentNotificationsController {
     await this.payments.acceptCash(this.wechat.notification(this.raw(request), request.headers))
   }
 
+  @Post('wechat/refund-notify')
+  @Public()
+  @SkipResponseTransform()
+  @HttpCode(204)
+  @ApiExcludeEndpoint()
+  async wechatRefundNotify(@Req() request: RawBodyRequest<FastifyRequest>) {
+    await this.payments.acceptWechatRefund(this.wechat.refundNotification(this.raw(request), request.headers))
+  }
+
   @Post('alipay/notify')
   @Public()
   @SkipResponseTransform()

@@ -46,7 +46,7 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 
 微信对原始请求体做RSA-SHA256验签、可信公钥ID和五分钟时间窗口检查，再AES-GCM解密；支付宝使用官方SDK的RSA2通知验签及应答验签。回调验证后先写不可变通知记录和outbox，再分别返回微信204或支付宝纯文本`success`。通知/支付参数/券码不会出现在请求响应日志中。
 
-结算重新校验商户、应用、环境、订单、金额、币种及数量，交易标识唯一且一笔订单只能关联一笔交易。预占核销、基础/赠送积分流水、用户累计/当日首单和支付状态原子提交。首单赠分按入账时判定；活动预算不足不影响基础权益，原保证赠分仍兑现。已关闭订单的迟到款保留待审，不利用已释放库存继续履约。退款扣回和自动对账尚在后续阶段，不把待审记录写为已处理。
+结算重新校验商户、应用、环境、订单、金额、币种及数量，交易标识唯一且一笔订单只能关联一笔交易。预占核销、基础/赠送积分流水、用户累计/当日首单和支付状态原子提交。首单赠分按入账时判定；活动预算不足不影响基础权益，原保证赠分仍兑现。已关闭订单的迟到款保留待审，不利用已释放库存继续履约，可在管理端原路全额退款。
 
 实现依据：[微信App下单](https://pay.wechatpay.cn/doc/v3/merchant/4013070347)、[微信Native下单](https://pay.wechatpay.cn/doc/v3/merchant/4012791877)、[支付宝官方Node SDK](https://github.com/alipay/alipay-sdk-nodejs-all)。上线前仍须完成真实商户权限、回调地址和客户端联调。
 
@@ -60,11 +60,25 @@ Apple客户端必须保留未完成交易，仅在本人订单状态`paid`后调
 
 Google `PENDING`不发积分、不占首单、不消费确认；正常等待按60秒延迟并重置失败计数，长时间待付款不会因此进入十次失败死信。网络/验真错误仍按故障退避，十次后需要运营处理。商店确认取消可结束尚未入账订单。内购无统一15分钟过期，已下架固定SKU的历史有效订单仍按旧权益履约。
 
-Apple通知通过JWS验真，Google RTDN通过OIDC校验受众、issuer、email_verified及推送服务账户；通知持久化后异步查商店最新状态，凭绑定UUID补单。无可靠归属的历史交易留`review`，不猜测用户。部分退款、多件购买、消费信息请求和不支持的商店事件须人工核查，不能按整单退款或新充值处理；退款扣回闭环仍在后续阶段。
+Apple通知通过JWS验真，Google RTDN通过OIDC校验受众、issuer、email_verified及推送服务账户；通知持久化后异步查商店最新状态，凭绑定UUID补单。无可靠归属的历史交易留`review`，不猜测用户。部分退款、多件购买、消费信息请求和不支持的商店事件须人工核查，不能按整单退款或新充值处理。
 
 Google purchaseToken及原通知用独立32字节AES-GCM密钥加密，文件存Base64文本，`dataKeyId`标识写入密钥。轮换时用`dataKeys`保留旧ID到文件的映射，使历史凭据仍可读取；AAD绑定渠道与应用。备份必须同时保留数据库和相应密钥，不能把凭据放在日志、URL或outbox明文中。
 
 实现依据：[Apple官方服务端SDK](https://github.com/apple/app-store-server-library-node)、[Google productsv2验真](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.productsv2/getproductpurchasev2)、[Google消费确认](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/consume)、[RTDN通知规则](https://developer.android.com/google/play/billing/rtdn-reference)。真实Apple证书链/OCSP、商店SKU、Google账户权限与RTDN推送均须在实际商店环境验证。
+
+## 全额退款、缺口与对账
+
+管理端使用独立退款权限申请微信/支付宝整单退款。原订单基础与赠分必须全部未消费、未冻结；有未处置的该订单风险时先人工复核。申请、原来源定向冻结、审计与退款任务原子提交，不挪用其他充值批次。已确认但未履约的迟到现金款也可原路退还。内购不提供站内发起退款，交由商店处理。
+
+退款任务使用固定退款编号和原金额重试，申请返回成功不代表已退款。微信签名退款查询明确`SUCCESS`，或支付宝验签查询明确`REFUND_SUCCESS`后，才扣回冻结积分并标记`refunded`。微信明确`CLOSED`才解冻；网络异常、未知状态或处理中均保留冻结，重复成功不再次扣回。普通积分接口不能核销/解冻退款凭证，不能单独冲正充值发放。
+
+微信退款通知入口为`/api/payments/wechat/refund-notify`，原始体验签解密后持久化查单线索，再查询签名结果。Apple/Google验真的整单退款追回原订单剩余可用和冻结积分；混合冻结中其他来源积分保持原样。Google绑定字段缺失时，仅用相同已入账交易补充缺失信息，不能覆盖矛盾绑定。已消费缺口写入风险记录并阻止消费，不产生负余额，也不扣别的充值。部分/未确认全额退款保留权益并限制消费，交人工核查。退款不恢复首单资格、券使用或已核销额度。
+
+对账权限可幂等创建指定订单后台任务，并恢复本订单死信；不抢占有效租约。默认主动查渠道，再校验账户与流水累计/连续性、批次分配回放、冻结凭证与明细、订单发放/退款审计及额度凭证。`verifyChannel=false`仅作站内检查，结果明确记录`channel_not_checked`。网络未知保持待处理，差异保留审计并限制消费，不能直接改余额“修平”。当前提供按订单发起任务，不包含银行结算账单下载、全量定时财务扫描或自动核销缺口。
+
+人工风险处置使用独立`system:billing:risk:resolve`权限，必须记录依据；所有风险解决后才恢复账户操作。处置不会生成虚假支付/退款或补偿积分。历史扣减涉及退款中的或已退款批次时禁止冲正恢复已撤销权益。
+
+实现依据：[微信退款查询](https://pay.wechatpay.cn/doc/v3/merchant/4012791884)、[支付宝退款查询](https://aipay.alipay.com/docs/vibe-pay/ai-web-app-payment-qianyi/api-list/alipay-trade-fastpay-refund-query.html)。渠道退款、缺口处置和实际商店通知仍须用真实配置完成联调。
 
 ## 开发验证
 
@@ -77,6 +91,7 @@ node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e 
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/orders.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/payments.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/iap.integration.mjs
+node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/refunds.integration.mjs
 ```
 
 已创建测试库时跳过createdb；按实际`POSTGRES_USER`替换示例用户名。测试保留本次独立业务记录，使用随机业务标识避免跨次互相干扰。覆盖200并发抢每日20份、预算回滚与消费/释放、版本降额保护、券固定权益、内购映射、首单事实保护及迁移往返/旧数据保留/实体diff。并发测试验证一致性，不代表生产吞吐已验收。

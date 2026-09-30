@@ -11,6 +11,7 @@ import { PaymentSecretsService } from '../dist/src/modules/billing/payments/paym
 import { PaymentsService } from '../dist/src/modules/billing/payments/payments.service.js'
 import { SettlementService } from '../dist/src/modules/billing/payments/settlement.service.js'
 import { PointsService } from '../dist/src/modules/billing/points/points.service.js'
+import { RefundsService } from '../dist/src/modules/billing/refunds/refunds.service.js'
 import { SysUserEntity } from '../dist/src/modules/user/entities/user.entity.js'
 import 'reflect-metadata'
 
@@ -70,10 +71,35 @@ before(async () => {
   catalog = new CatalogService(source, quotas)
   orders = new OrdersService(source, catalog, quotas, outbox = new BillingOutboxService(source))
   points = new PointsService(source)
-  const settlement = new SettlementService(source, catalog, orders, quotas, points, outbox)
+  const refunds = new RefundsService(source, orders, points, outbox, {}, {})
+  const settlement = new SettlementService(source, catalog, orders, quotas, points, outbox, refunds)
   const secrets = new PaymentSecretsService({ dataKey: () => ({ key: Buffer.alloc(32, 53), id: 'fixture' }) })
   payments = new PaymentsService(source, catalog, orders, outbox, settlement, {}, {}, apple, google, secrets)
   actor = await user()
+})
+
+test('Apple/Google验真全额退款追回原权益，Google缺失绑定仅从已持久化同交易恢复；退款早于入账不占首单', async () => {
+  for (const channel of ['apple', 'google']) {
+    const buyer = await user()
+    const { row, parameters } = await order(buyer, await pack(), channel)
+    const credential = purchase(row, parameters)
+    const accepted = await receipt(buyer, row, credential)
+    await payments.processInbox(accepted.inboxId)
+    proofs.set(credential, { ...proofs.get(credential), state: 'refunded', refundScope: 'full', evidenceHash: createHash('sha256').update(`refund:${credential}`).digest('hex'), ...(channel === 'google' ? { bindingToken: null, storeAccountId: null } : {}) })
+    const refunded = channel === 'google' ? await payments.acceptGoogle(credential) : await payments.acceptApple(credential)
+    await payments.processInbox(refunded.inboxId)
+    assert.equal((await orders.get(buyer.id, row.id)).status, 'refunded')
+    assert.equal((await points.account(buyer.id)).available, '0')
+    assert.equal((await source.query('SELECT first_order_id::text FROM biz_recharge_user_state WHERE user_id=$1', [buyer.id]))[0].first_order_id, row.id)
+  }
+  const buyer = await user()
+  const { row, parameters } = await order(buyer, await pack(), 'apple')
+  const credential = purchase(row, parameters, { state: 'refunded', refundScope: 'full' })
+  const inbox = await receipt(buyer, row, credential)
+  await payments.processInbox(inbox.inboxId)
+  assert.equal((await orders.get(buyer.id, row.id)).status, 'refunded')
+  assert.equal((await points.account(buyer.id)).available, '0')
+  assert.equal((await source.query('SELECT first_order_id FROM biz_recharge_user_state WHERE user_id=$1', [buyer.id]))[0].first_order_id, null)
 })
 after(async () => {
   if (source?.isInitialized)

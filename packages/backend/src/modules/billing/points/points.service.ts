@@ -1,4 +1,5 @@
 import type { PointCommand } from './points.types.js'
+import { createHash } from 'node:crypto'
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { DataSource, EntityManager, In, LessThan } from 'typeorm'
 import { UserStatus } from '#/modules/system/sys-user/sys-user.types.js'
@@ -77,7 +78,7 @@ export class PointsService {
   }
 
   /** 调用方须先按项目锁序锁定用户；trustedUserLocked仅供内部已持锁聚合使用。 */
-  async executeInTransaction(manager: EntityManager, command: PointCommand, options: { trustedUserLocked?: boolean, allowInactive?: boolean } = {}) {
+  async executeInTransaction(manager: EntityManager, command: PointCommand, options: { trustedUserLocked?: boolean, allowInactive?: boolean, sourceGrantIds?: string[] } = {}) {
     validatePointCommand(command)
     if (!manager.queryRunner?.isTransactionActive)
       throw new Error('积分写入必须在数据库事务中执行')
@@ -96,7 +97,15 @@ export class PointsService {
     await accounts.createQueryBuilder().insert().values({ userId: command.userId, tenantId: '1' }).orIgnore().execute()
     const account = await accounts.findOneOrFail({ where: { userId: command.userId, tenantId: '1' }, lock: { mode: 'pessimistic_write' } })
     const key = `${command.userId}:${command.businessKey}`
-    const hash = pointFingerprint(command)
+    const sources = options.sourceGrantIds?.slice()
+    if (sources) {
+      if (!['debit', 'freeze', 'capture'].includes(command.action) || sources.length < 1 || sources.length > 2 || new Set(sources).size !== sources.length)
+        throw new Error('定向扣回只允许原订单的一至两个发放批次')
+      for (const id of sources)
+        positiveInteger(id, 'sourceGrantId')
+      sources.sort((a, b) => BigInt(a) < BigInt(b) ? -1 : 1)
+    }
+    const hash = sources ? createHash('sha256').update(`${pointFingerprint(command)}:source:${JSON.stringify(sources)}`).digest('hex') : pointFingerprint(command)
     const ledgers = manager.getRepository(PointLedgerEntity)
     const duplicate = await ledgers.findOneBy({ tenantId: '1', businessType: command.businessType, businessKey: key })
     if (duplicate) {
@@ -122,26 +131,32 @@ export class PointsService {
       case 'freeze':
         if (available < amount)
           throw new ConflictException('可用积分不足')
-        allocations = await this.spendLots(manager, account.id, amount, command.action === 'freeze')
+        allocations = await this.spendLots(manager, account.id, amount, command.action === 'freeze', sources)
         availableDelta = -amount
         frozenDelta = command.action === 'freeze' ? amount : 0n
         break
       case 'capture':
-      case 'unfreeze':
+      case 'unfreeze': {
         hold = await manager.getRepository(PointHoldEntity).findOne({
           where: { id: command.holdId, accountId: account.id },
           lock: { mode: 'pessimistic_write' },
         })
         if (!hold || BigInt(hold.remaining) < amount)
           throw new ConflictException('冻结凭证不存在或剩余积分不足')
-        allocations = await this.releaseHold(manager, hold, amount, command.action === 'unfreeze')
+        const holdLedger = await ledgers.findOneByOrFail({ id: hold.ledgerId })
+        if (holdLedger.businessType === 'recharge_refund' && (!options.trustedUserLocked || command.businessType !== 'recharge_refund'))
+          throw new ConflictException('退款冻结凭证仅允许原订单退款处理器核销或解冻')
+        allocations = await this.releaseHold(manager, hold, amount, command.action === 'unfreeze', sources)
         frozenDelta = -amount
         availableDelta = command.action === 'unfreeze' ? amount : 0n
         break
+      }
       case 'reverse': {
         const original = await ledgers.findOneBy({ id: command.referenceId, accountId: account.id })
         if (!original || !['grant', 'debit'].includes(original.action) || original.amount !== command.amount)
           throw new ConflictException('仅支持完整冲正本账户的发放或扣减流水')
+        if (original.action === 'grant' && original.businessType === 'recharge')
+          throw new ConflictException('充值发放须通过原订单退款或对账处理，不能单独冲正破坏订单权益')
         if (await ledgers.existsBy({ referenceId: original.id, action: 'reverse' }))
           throw new ConflictException('原流水已冲正')
         allocations = await this.reverseLots(manager, original)
@@ -205,9 +220,12 @@ export class PointsService {
     return this.result(manager, ledger)
   }
 
-  private async spendLots(manager: EntityManager, accountId: string, amount: bigint, freeze: boolean): Promise<Allocation[]> {
+  private async spendLots(manager: EntityManager, accountId: string, amount: bigint, freeze: boolean, sources?: string[]): Promise<Allocation[]> {
     const repository = manager.getRepository(PointLotEntity)
-    const locked = await repository.createQueryBuilder('lot').where('lot.account_id = :accountId AND lot.available > 0', { accountId }).orderBy('lot.id', 'ASC').setLock('pessimistic_write').getMany()
+    const query = repository.createQueryBuilder('lot').where('lot.account_id = :accountId AND lot.available > 0', { accountId })
+    if (sources)
+      query.andWhere('lot.grant_id IN (:...sources)', { sources })
+    const locked = await query.orderBy('lot.id', 'ASC').setLock('pessimistic_write').getMany()
     // 先按ID锁定，再按赠分优先/FIFO分配，保持一致锁序。
     const lots = locked.sort((a, b) => a.kind === b.kind ? (BigInt(a.id) < BigInt(b.id) ? -1 : 1) : a.kind === 'gift' ? -1 : 1)
     const allocations: Allocation[] = []
@@ -225,7 +243,7 @@ export class PointsService {
     return allocations
   }
 
-  private async releaseHold(manager: EntityManager, hold: PointHoldEntity, amount: bigint, unfreeze: boolean): Promise<Allocation[]> {
+  private async releaseHold(manager: EntityManager, hold: PointHoldEntity, amount: bigint, unfreeze: boolean, sources?: string[]): Promise<Allocation[]> {
     const itemRepository = manager.getRepository(PointHoldItemEntity)
     const items = await itemRepository.find({ where: { holdId: hold.id }, order: { lotId: 'ASC' }, lock: { mode: 'pessimistic_write' } })
     const lots = await manager.getRepository(PointLotEntity).find({ where: { id: In(items.map(item => item.lotId)), accountId: hold.accountId }, order: { id: 'ASC' }, lock: { mode: 'pessimistic_write' } })
@@ -235,6 +253,8 @@ export class PointsService {
     for (const item of items) {
       if (!remaining)
         break
+      if (sources && !sources.includes(byId.get(item.lotId)?.grantId ?? ''))
+        continue
       const take = remaining < BigInt(item.remaining) ? remaining : BigInt(item.remaining)
       if (!take)
         continue
@@ -257,6 +277,10 @@ export class PointsService {
     const repository = manager.getRepository(PointLotEntity)
     const lots = await repository.find({ where: { id: In(allocations.map(item => item.lotId)), accountId: original.accountId }, order: { id: 'ASC' }, lock: { mode: 'pessimistic_write' } })
     const byId = new Map(lots.map(lot => [lot.id, lot]))
+    if (original.action === 'debit' && (await manager.query(`SELECT to_regclass('biz_recharge_order') IS NOT NULL AS present`))[0].present
+      && (await manager.query(`SELECT EXISTS(SELECT 1 FROM biz_recharge_order WHERE status IN ('refund_pending','refunded') AND (paid_ledger_id=ANY($1::bigint[]) OR gift_ledger_id=ANY($1::bigint[]))) AS revoked`, [lots.map(lot => lot.grantId)]))[0].revoked) {
+      throw new ConflictException('原扣减包含已退款或退款中的充值批次，禁止恢复已撤销权益')
+    }
     if (allocations.reduce((sum, item) => sum + BigInt(item.amount), 0n) !== BigInt(original.amount))
       throw new ConflictException('原流水分配记录不完整')
     for (const item of allocations) {

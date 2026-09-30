@@ -93,3 +93,40 @@ test('Google productsv2按token去重、待付款不假造完成时间、检测�
 function createHashForToken(token) {
   return createHash('sha256').update(token).digest('hex')
 }
+
+test('退款契约：微信签名查询状态和金额、加密退款通知；支付宝成功码不能替代退款成功状态', async () => {
+  const wechat = new WechatProvider(config)
+  const original = globalThis.fetch
+  globalThis.fetch = async (url, options) => {
+    assert.ok(new URL(url).pathname.startsWith('/v3/refund/domestic/refunds'))
+    if (options.method === 'POST') {
+      const data = JSON.parse(options.body)
+      assert.equal(data.out_refund_no, 'refundfixture')
+      assert.deepEqual(data.amount, { refund: 1000, total: 1000, currency: 'CNY' })
+    }
+    const text = JSON.stringify({ out_trade_no: order.merchantNo, transaction_id: 'tx', out_refund_no: 'refundfixture', refund_id: 'providerrefund', status: 'SUCCESS', amount: { total: 1000, refund: 1000, currency: 'CNY' } })
+    return new Response(text, { headers: wechatHeaders(text) })
+  }
+  try {
+    await wechat.refund(order, 'refundfixture', '全额退款')
+    assert.equal((await wechat.refundQuery('refundfixture')).state, 'succeeded')
+  }
+  finally {
+    globalThis.fetch = original
+  }
+  const data = { mchid: settings.wechat.merchantId, out_trade_no: order.merchantNo, out_refund_no: 'refundfixture', refund_status: 'SUCCESS' }
+  const cipher = createCipheriv('aes-256-gcm', config.file('v3'), Buffer.from('123456789012'))
+  cipher.setAAD(Buffer.from('refund'))
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final(), cipher.getAuthTag()]).toString('base64')
+  const raw = Buffer.from(JSON.stringify({ event_type: 'REFUND.SUCCESS', resource: { algorithm: 'AEAD_AES_256_GCM', nonce: '123456789012', associated_data: 'refund', ciphertext } }))
+  assert.equal(wechat.refundNotification(raw, wechatHeaders(raw)).refundNo, 'refundfixture')
+  assert.throws(() => wechat.refundNotification(Buffer.from(`${raw} `), wechatHeaders(raw)), /验签/)
+  const alipay = new AlipayProvider(config)
+  const response = { code: '10000', out_trade_no: order.merchantNo, out_request_no: 'refundfixture', trade_no: 'tx', total_amount: '10.00', refund_amount: '10.00' }
+  alipay.execute = async () => response
+  await assert.rejects(alipay.refundQuery('refundfixture', order.merchantNo), /未确认退款成功/)
+  response.refund_status = 'REFUND_SUCCESS'
+  assert.equal((await alipay.refundQuery('refundfixture', order.merchantNo)).refundMinor, '1000')
+  response.out_request_no = 'other'
+  await assert.rejects(alipay.refundQuery('refundfixture', order.merchantNo), /编号/)
+})

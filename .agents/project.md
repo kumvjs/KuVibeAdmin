@@ -48,4 +48,9 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 ## 交付与验收入口
 
-根目录提供 start:local/start:dev/start:prod/build/setup/test/typecheck/docs:* 及迁移命令，自动在 core 执行，环境文件仍放在 packages/backend。后端为私有应用包 @kumvjs/kuvibe-admin-core；正式版本使用 GitHub Release，不发布 npm。可重复验收见 docs/guide/release-verification.md；团队提示词仍以 docs/guide/getting-started.md#团队统一使用方式 为统一入口。DTO 部分更新须使用 hasSubmittedField 区分 undefined 与显式 null，不能仅依据 Object.hasOwn。
+根目录提供 start:local/start:dev/start:prod/build/setup/test/typecheck/docs:* 及迁移命令，自动在 packages/backend 执行，环境文件仍放在 packages/backend。后端为私有应用包 @kumvjs/kuvibe-admin-backend；正式版本使用 GitHub Release，不发布 npm。可重复验收见 docs/guide/release-verification.md；团队提示词仍以 docs/guide/getting-started.md#团队统一使用方式 为统一入口。DTO 部分更新须使用 hasSubmittedField 区分 undefined 与显式 null，不能仅依据 Object.hasOwn。
+
+
+## Docker 运行
+
+根 Dockerfile 与 compose.yaml 提供后端、PostgreSQL 18.6-bookworm 和 Redis 8；使用 PostgreSQL 18 的 /var/lib/postgresql 数据卷布局。根 .env 独立保存容器配置和随机密钥，scripts/docker-init.mjs 不覆盖已有文件；迁移和 setup 显式运行，后端 node 普通用户，数据库/Redis/附件/公开资源分别持久化。Docker 本地默认 local，生产必须按 docs/guide/docker.md 配置 HTTPS/CORS/Secure Cookie。新增 1790744400000 迁移补齐 CommonEntity 已预留的 tenant_id，非 1 数据时拒绝回滚；不提供租户隔离能力。

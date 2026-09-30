@@ -1,0 +1,17 @@
+# 只允许构建所需文件进入上下文，排除环境、附件和本机依赖。
+**
+!Dockerfile
+!pnpm-workspace.yaml
+!packages/
+!packages/backend/
+!packages/backend/package.json
+!packages/backend/pnpm-lock.yaml
+!packages/backend/nest-cli.json
+!packages/backend/tsconfig*.json
+!packages/backend/src/
+!packages/backend/src/**
+!docker/
+!docker/healthcheck.mjs
+
+!packages/backend/types/
+!packages/backend/types/**

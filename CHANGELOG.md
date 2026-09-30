@@ -1,11 +1,17 @@
 # 变更记录
 
-## 1.3.0 — 2026-09-25
+## 1.3.0 — 2026-09-30
 
 - Swagger 开启时从实际文档导出 `packages/backend/openapi/openapi.json`，供前端本地生成；关闭时不导出，已有快照保留。
 - Playground 新增独立 OpenAPI-TS/Axios 客户端，按 JSON 中的 tag 分组生成请求与类型，公共 DTO 分文件；业务请求支持 Bearer Token、Cookie、响应解包与业务错误。
 - 修正登录 User-Agent 的 Swagger 可选性及响应 `data` 必填声明，使生成类型符合实际契约；Playground 站点名称改为 KuVibeAdmin。原有 `src/api` 和 `baseRequestClient` 保持不变。
-- 新增能力，根目录与后端统一 minor：1.2.2 → 1.3.0；KuVibe schema/revision 不变。
+- 新增多阶段后端 Docker 镜像与 Compose，使用 Node.js 24、指定的 PostgreSQL 18.6-bookworm、Redis 8；适配 PostgreSQL 18 数据卷路径。
+- 提供独立迁移、交互管理员初始化、健康检查和数据库/Redis/附件/公开资源持久化；普通用户运行，数据库及 Redis 端口仅在容器网络内可达。
+- Docker 初始化独立生成并保留根 .env 的四项随机密钥，setup 沿用注入值，不覆盖已有环境；镜像排除宿主机环境和附件。
+- 补齐后端锁文件中已有的五项依赖，以及 13 表预留 tenant_id 的缺失迁移；保留历史文件，回滚遇到非默认租户数据时拒绝删列。
+- 空 Cookie Domain 沿用 host-only，保留生产 HTTPS、精确 Origin 和 Secure Cookie 校验；新增相关回归测试。
+- 冻结构建、PostgreSQL 18.6 带数据迁移往返/初始化、真实 HTTP/登录/刷新、原生模块/卷权限/重建、production、类型检查、变更文件 ESLint 和文档构建通过。
+- 新增 Playground 客户端与兼容 Docker 能力，统一 minor：根与 backend 1.2.2 → 1.3.0；KuVibe schema/revision 不变。Atlas CLI/Pro lint 及生产规模迁移/备份恢复演练未执行，不代表现有生产库可直接上线。
 
 ## 1.2.2 — 2026-09-18
 

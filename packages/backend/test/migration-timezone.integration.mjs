@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm'
 import { UpdateTable1789459958471 } from '../dist/src/migrations/1789459958471-update-table.js'
 import { UpdateTable1789491815418 } from '../dist/src/migrations/1789491815418-update-table.js'
 import { UpdateTable1789648814246 } from '../dist/src/migrations/1789648814246-update-table.js'
+import { AddTenantId1790744400000 } from '../dist/src/migrations/1790744400000-add-tenant-id.js'
 
 test('UTC 历史数据在非 UTC 会话中升级、回滚、再次升级均保持不变', async () => {
   assert.ok(process.env.MIGRATION_TEST_DATABASE_URL, '必须提供本次专用隔离数据库，禁止用日常数据库')
@@ -105,6 +106,31 @@ test('UTC 历史数据在非 UTC 会话中升级、回滚、再次升级均保�
         FROM pg_attribute WHERE attrelid = 'user_refresh_token'::regclass AND attname = 'expired_at'`)
       assert.equal(comment.value, '令牌过期时间')
     }
+    // 后续兼容迁移补齐实体已有的预留 tenant_id，保留全部代表性旧数据。
+    const tenantMigration = new AddTenantId1790744400000()
+    for (const direction of ['up', 'down', 'up']) {
+      await tenantMigration[direction](runner)
+      assert.deepEqual(await snapshot(), before, `租户迁移 ${direction} 保留旧行与时间点`)
+      assert.deepEqual(await indexes(), beforeIndexes, `租户迁移 ${direction} 保留索引`)
+      assert.deepEqual((await constraints()).filter(c => c.definition !== 'NOT NULL tenant_id'), beforeConstraints, `租户迁移 ${direction} 保留已有约束`)
+      const tenantColumns = await runner.query(`SELECT table_name, data_type, is_nullable, column_default
+        FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'tenant_id'`)
+      assert.equal(tenantColumns.length, direction === 'up' ? 13 : 0)
+      if (direction === 'up') {
+        for (const table of Object.keys(fixtures)) {
+          const rows = await runner.query(`SELECT tenant_id::text AS value FROM "${table}"`)
+          assert.ok(rows.every(row => row.value === '1'), `${table} 沿用预留单租户默认值`)
+        }
+        assert.ok(tenantColumns.every(c => c.data_type === 'bigint' && c.is_nullable === 'NO'))
+      }
+    }
+    // 不丢弃将来写入的租户数据，也不在失败前删掉其他表的列。
+    await runner.query('UPDATE sys_user SET tenant_id = 2 WHERE id = 1')
+    await assert.rejects(() => tenantMigration.down(runner), /拒绝回滚/)
+    const [remaining] = await runner.query(`SELECT count(*)::int AS count
+      FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'tenant_id'`)
+    assert.equal(remaining.count, 13)
+    await runner.query('UPDATE sys_user SET tenant_id = 1 WHERE id = 1')
     // 与实体做只读比较；使用同一事务连接以看见尚未提交的测试结构。
     const createRunner = source.createQueryRunner.bind(source)
     const release = runner.release.bind(runner)

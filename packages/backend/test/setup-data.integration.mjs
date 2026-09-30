@@ -34,8 +34,8 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     const ordinary = await roles.findOneByOrFail({ code: 'user' })
     assert.equal(ordinary.isDefault, true)
     assert.equal(await links.count(), 0)
-    assert.equal(await menus.count(), 42)
-    assert.equal((await menus.find()).filter(menu => menu.authCode).length, 38)
+    assert.equal(await menus.count(), INITIAL_MENUS.length)
+    assert.equal((await menus.find()).filter(menu => menu.authCode).length, INITIAL_MENUS.filter(menu => menu.authCode).length)
     const root = await source.getRepository(SysDeptEntity).findOneByOrFail({ id: result.rootDeptId })
     assert.equal(root.pid, null)
     const dept = await menus.findOneByOrFail({ name: 'SystemDept' })
@@ -109,7 +109,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
       assert.equal(upgraded.pid, upgradedGroup.id)
       assert.deepEqual(upgraded.meta, permission.meta)
     }
-    assert.equal(await menus.count(), 43)
+    assert.equal(await menus.count(), INITIAL_MENUS.length + 1)
     assert.equal(await source.getRepository(SysDeptEntity).count(), 1)
     assert.equal(await roles.count(), 2)
     assert.deepEqual((await links.findBy({ roleId: ordinary.id })).map(link => link.menuId), [business.id])
@@ -128,7 +128,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     assert.deepEqual(routes.find(route => route.name === 'SystemBilling').children.map(route => route.name).sort(), ['BillingCatalogRead', 'BillingOrderRead', 'BillingPromotionRead'])
     assert.ok((await runtime.getPermissionsByUserId(user.id)).includes('system:attachment:read'))
     await initializeBaseData(source)
-    assert.equal(await menus.count(), 43)
+    assert.equal(await menus.count(), INITIAL_MENUS.length + 1)
 
     // 未知目录归属拒绝覆盖；前面已执行的业务目录调整也必须一起回滚。
     await menus.update(billingGroups[0].id, { pid: system.id })

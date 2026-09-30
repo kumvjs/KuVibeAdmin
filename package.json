@@ -1,6 +1,6 @@
 {
   "name": "kuvibe-admin",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "基于 KuVibe 的 AI 友好 NestJS 后端底座，面向 Vben Admin 管理系统",
   "scripts": {
     "docker:init:dev": "node scripts/docker-init.mjs --dev",
@@ -21,6 +21,8 @@
     "test:e2e": "pnpm --dir packages/backend test:e2e",
     "test:release": "pnpm --dir packages/backend test:release",
     "test:upload:integration": "pnpm --dir packages/backend test:upload:integration",
+    "test:tasks:integration": "pnpm --dir packages/backend test:tasks:integration",
+    "test:rabbitmq:integration": "pnpm --dir packages/backend test:rabbitmq:integration",
     "test:timezone:integration": "pnpm --dir packages/backend test:timezone:integration",
     "test:migration:integration": "pnpm --dir packages/backend test:migration:integration",
     "migration:create": "pnpm --dir packages/backend migration:create",

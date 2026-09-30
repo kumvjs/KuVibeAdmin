@@ -4,7 +4,7 @@ import type { AttachmentBusiness } from './attachment-business.registry.js'
 import type { AttachmentQueryDto, AttachmentResponseDto } from './dto/attachment.dto.js'
 import type { UploadPolicyResponseDto } from './dto/upload-policy.dto.js'
 import { randomUUID } from 'node:crypto'
-import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, UnprocessableEntityException } from '@nestjs/common'
+import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnModuleInit, UnprocessableEntityException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { LessThanOrEqual, Repository } from 'typeorm'
 import { APP_CONFIG } from '#/config/app.config.js'
@@ -18,10 +18,8 @@ import { AttachmentEntity } from './entities/attachment.entity.js'
 import { LocalUploadStorage } from './local-upload.storage.js'
 
 @Injectable()
-export class AttachmentService implements OnModuleInit, OnModuleDestroy {
+export class AttachmentService implements OnModuleInit {
   private readonly logger = new Logger(AttachmentService.name)
-  private timer?: ReturnType<typeof setInterval>
-  private cleanupTask?: Promise<void>
 
   constructor(
     @InjectRepository(AttachmentEntity) private readonly repository: Repository<AttachmentEntity>,
@@ -42,20 +40,6 @@ export class AttachmentService implements OnModuleInit, OnModuleDestroy {
       isPublic: async (manager, business, attachmentId) => business.field === 'avatar'
         && await manager.getRepository(SysUserEntity).existsBy({ id: business.businessId, status: 1, avatar: this.url(attachmentId, true) }),
     })
-    this.timer = setInterval(() => {
-      if (!this.cleanupTask) {
-        this.cleanupTask = this.cleanup().catch(() => this.logger.error('附件清理失败，下一周期重试')).finally(() => {
-          this.cleanupTask = undefined
-        })
-      }
-    }, 60_000)
-    this.timer.unref()
-  }
-
-  async onModuleDestroy() {
-    if (this.timer)
-      clearInterval(this.timer)
-    await this.cleanupTask
   }
 
   assertId(id: string): void {

@@ -21,6 +21,7 @@ x-billing-scale: &billing-scale
     REDIS_DB: '5'
     BILLING_WORKER_ENABLED: 'false'
     BILLING_CONFIG_FILE: ''
+    RABBITMQ_QUEUE: kuvibe.billing.scale
 
 services:
   billing-api-1:

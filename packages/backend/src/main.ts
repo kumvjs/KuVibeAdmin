@@ -112,4 +112,18 @@ catch (error) {
   // startup when running the generated ESM entrypoint.
   console.error('[BOOT] bootstrap failed', error)
   process.exitCode = 1
+  // 监听失败时 Nest 已初始化 cron、Redis 和 RabbitMQ；必须清理，避免 watch 留下消费者孤儿。
+  const shutdownDeadline = setTimeout(() => process.exit(1), 15_000)
+  shutdownDeadline.unref()
+  try {
+    // eslint-disable-next-line antfu/no-top-level-await
+    await fastifyApp.close()
+  }
+  catch {
+    console.error('[BOOT] cleanup failed')
+  }
+  finally {
+    clearTimeout(shutdownDeadline)
+    process.exit(1)
+  }
 }

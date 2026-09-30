@@ -31,6 +31,6 @@ import { RefundsService } from './refunds/refunds.service.js'
   imports: [TypeOrmModule.forFeature([PointAccountEntity, PointLedgerEntity, PointLotEntity, PointAllocationEntity, PointHoldEntity, PointHoldItemEntity])],
   controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController, RefundsController, BillingRisksController],
   providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService, AppleProvider, GoogleProvider, PaymentSecretsService, RefundsService, ReconciliationService],
-  exports: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService],
+  exports: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker],
 })
 export class BillingModule {}

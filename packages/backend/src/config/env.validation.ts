@@ -68,6 +68,16 @@ export const envValidationSchema = Joi.object({
   REDIS_PORT: Joi.number().required(),
   REDIS_PASSWORD: Joi.string().allow('').optional(),
   REDIS_DB: Joi.number().default(0),
+  RABBITMQ_ENABLED: Joi.boolean().default(false),
+  RABBITMQ_HOST: Joi.string().hostname().default('localhost'),
+  RABBITMQ_PORT: Joi.number().integer().min(1).max(65535).default(5672),
+  RABBITMQ_USERNAME: Joi.string().when('RABBITMQ_ENABLED', { is: true, then: Joi.required(), otherwise: Joi.optional() }),
+  RABBITMQ_PASSWORD: Joi.string().when('RABBITMQ_ENABLED', { is: true, then: Joi.required(), otherwise: Joi.optional() }),
+  RABBITMQ_VHOST: Joi.string().default('/'),
+  RABBITMQ_QUEUE: Joi.string().pattern(/^[\w.-]{1,100}$/).default('kuvibe.billing'),
+  RABBITMQ_PREFETCH: Joi.number().integer().min(1).max(20).default(5),
+  TASK_LOG_RETENTION_DAYS: Joi.number().integer().min(1).max(365).default(30),
+  TASK_EXECUTION_CONCURRENCY: Joi.number().integer().min(1).max(4).default(2),
 
   LOGGER_LOG_LEVELS: Joi.string().empty('').custom((value, helpers) => {
     const levels = value

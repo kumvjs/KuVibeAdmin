@@ -67,3 +67,11 @@ order: number
 - 后端镜像使用 Node.js 24 Debian slim、pnpm 11.25.0，按 backend 独立锁文件冻结安装，沿用根工作区原生依赖构建许可；编译、生产依赖和运行阶段分离。
 - Compose 固定 PostgreSQL 18.6-bookworm，卷挂 /var/lib/postgresql；Redis 8 开启 AOF，内部服务使用 service DNS，不向宿主机发布数据库/Redis 端口。
 - 根 .env 不进镜像；工具直接调用编译 CLI 保留 NODE_ENV，setup 使用已有注入密钥；HTTP 健康检查使用生产也公开的时区只读接口。见 docs/guide/docker.md。
+
+### 动态任务与消息
+
+- @nestjs/schedule 12.0.2、cron 4.4.0，通过动态CronJob恢复并同步数据库配置；task DTO、控制器及日志契约纳入Swagger。
+- amqplib 2.2.0对接RabbitMQ 4.3.6-management；持久ID消息、confirm发布、manual ack、prefetch及跨重连进程上限，最大队列10000拒绝溢出，故障由DB outbox补偿。
+- sys_scheduled_task与sys_task_execution由1790800000000迁移创建，不重写账务旧表；使用后的配置/执行快照阻断删表回退。CLI/lint缺失时按Atlas Skill执行隔离SQL/数据验证并明确限制。
+- 调度默认并发2（1–4），等待taskId最多100、按处理器FIFO；日志默认30天（1–365），每实例每5分钟删最多1000结束行。增加高频任务必须评估生成/清理速率，不用运行日志替代账务流水。
+- 测试归属backend任务模块，test:tasks:integration与test:rabbitmq:integration使用随机子数据库/queue；HTTP测试固定Redis DB14。不得对日常业务库或生产执行这些测试。

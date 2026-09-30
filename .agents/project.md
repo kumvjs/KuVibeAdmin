@@ -41,7 +41,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 ## 产品版本约定
 
-- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `1.3.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
+- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `1.4.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
 - 撤销此前“开发期默认延后递增”的 Agent 推断：缺少发布脚本、CHANGELOG 及历史递增记录不能证明存在延后政策。仅明确用户决定、发布政策或实际生效的自动化及其递增触发条件可支持 deferred；旧工程笔记保留作历史，不作为例外依据。
 - 固定统一版本：以根 `package.json` 为发布权威，`packages/backend/package.json` 同步相同版本；依据为用户在 2026-09-17 本次刷新中明确选择“统一版本：根目录与 core 同步递增”。按整个完成需求的最高语义影响递增一次，不按包分别重复递增；`docs/package.json` 继续无版本。
 - 每个完整需求通过实现、验收、审查和文档检查后，仅评估一次版本影响；按 `kuVibe.md` §30.1 记录需求标识、基线、目标、语义/有效影响及版本来源，重试沿用原决定。范围明确且无有效例外时实际递增，同步相关清单、内部依赖、锁文件和 CHANGELOG；总结必须报告影响、结果、旧版本 → 新版本及原因。
@@ -58,3 +58,13 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 开发前端使用 compose.dev.frontend.yaml 叠加原开发环境，普通 node 用户、回环端口5999、只读热更新挂载、同源 /api 代理；独立 pnpm 锁文件与镜像依赖隔离。启动与边界见 docs/frontend/billing.md。
 
 根 Dockerfile 与 compose.yaml 提供后端、PostgreSQL 18.6-bookworm 和 Redis 8；使用 PostgreSQL 18 的 /var/lib/postgresql 数据卷布局。根 .env 独立保存容器配置和随机密钥，scripts/docker-init.mjs 不覆盖已有文件；迁移和 setup 显式运行，后端 node 普通用户，数据库/Redis/附件/公开资源分别持久化。Docker 本地默认 local，生产必须按 docs/guide/docker.md 配置 HTTPS/CORS/Secure Cookie。新增 1790744400000 迁移补齐 CommonEntity 已预留的 tenant_id，非 1 数据时拒绝回滚；不提供租户隔离能力。
+
+## 任务调度与消息
+
+2026-09-30新增 tasks 模块与 Playground“系统管理 → 任务调度”，支持在线六段 cron/IANA 配置、启停、手动执行和持久执行快照。只调用注册处理器，跨实例使用 PostgreSQL 调度键/锁，单实例并发与等待队列有界；删除任务保留历史，执行日志默认30天分批清理。
+
+订单 outbox 为异步业务真源，RabbitMQ只发送 ID；保持资金领域幂等、租约、有限重试及待确认语义。账务worker与附件清理已移除setInterval，默认任务为billing.outbox和attachments.cleanup。RabbitMQ固定4.3.6-management，新增独立密码/vhost/持久卷与回环管理端口；开发宿主机AMQP5673、管理15673。
+
+根pnpm工作区只包括docs/backend，Vben保持自身独立workspace/catalog/锁。pnpm11显式virtualStoreType: project，保持本地与CI一致；独立backend锁仍供Docker冻结构建。watch入口--no-shell，启动失败清理Nest资源，避免重复消费者。
+
+使用、恢复及两项重复集成测试见docs/modules/task-scheduling.md。仅本地开发迁移/部署已完成，Atlas CLI lint及生产升级未执行；旧points-recharge-orders真实四渠道与生产容量门槛仍在active，独立需求版本归属需核对，不能直接覆盖当前1.4.0。

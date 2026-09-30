@@ -40,10 +40,22 @@ x-backend: &backend
     REFRESH_TOKEN_EXPIRE: '2592000'
     BILLING_CONFIG_FILE: ${BILLING_CONFIG_FILE:-}
     BILLING_WORKER_ENABLED: ${BILLING_WORKER_ENABLED:-true}
+    RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}
+    RABBITMQ_HOST: rabbitmq
+    RABBITMQ_PORT: '5672'
+    RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-ku_vibe_admin}
+    RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请运行 node scripts/docker-init.mjs --rabbitmq 或配置 RABBITMQ_PASSWORD}
+    RABBITMQ_VHOST: ${RABBITMQ_VHOST:-kuvibe}
+    RABBITMQ_PREFETCH: ${RABBITMQ_PREFETCH:-5}
+    RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-kuvibe.billing}
+    TASK_LOG_RETENTION_DAYS: ${TASK_LOG_RETENTION_DAYS:-30}
+    TASK_EXECUTION_CONCURRENCY: ${TASK_EXECUTION_CONCURRENCY:-2}
   depends_on:
     postgres:
       condition: service_healthy
     redis:
+      condition: service_healthy
+    rabbitmq:
       condition: service_healthy
 
 services:
@@ -90,6 +102,26 @@ services:
       timeout: 5s
       retries: 12
 
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.3.6-management}
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-ku_vibe_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请配置 RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-kuvibe}
+    ports:
+      - '127.0.0.1:${DOCKER_RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD-SHELL', 'rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms']
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 30s
+
   migrate:
     <<: *backend
     profiles: [tools]
@@ -112,5 +144,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  rabbitmq-data:
   attachments:
   public:

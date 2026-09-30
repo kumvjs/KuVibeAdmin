@@ -51,6 +51,24 @@ Refresh Token Cookie 的 Path 根据 `GLOBAL_PREFIX` 固定到 `/<prefix>/auth`�
 
 所有带浏览器 `Origin` 的非安全方法都会在业务逻辑之前检查可信来源。CORS 决定浏览器能否读取响应，Origin 检查负责阻止跨站写入；无 Origin 的 CLI 和服务间请求继续可用。若前后端属于不同站点，需要配置 `AUTH_COOKIE_SAME_SITE=none`、`AUTH_COOKIE_SECURE=true`，并把准确的前端 Origin 加入 `APP_CORS_ORIGINS`。
 
+## 任务调度与 RabbitMQ
+
+任务 cron、IANA 执行时区及启停配置保存在数据库，通过后台“系统管理 → 任务调度”维护。处理器由服务端注册，配置不能执行任意脚本；配置和执行日志说明见[任务调度](../modules/task-scheduling.md)。
+
+| 变量 | 说明 |
+| --- | --- |
+| `RABBITMQ_ENABLED` | 非 Docker 环境默认 `false`；Compose 默认 `true`，启用时需要独立消息凭据 |
+| `RABBITMQ_HOST` / `RABBITMQ_PORT` | AMQP 地址，端口默认 `5672`；Compose 使用 `rabbitmq:5672` |
+| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | 启用消息连接时必填；Compose 初始化生成独立密码 |
+| `RABBITMQ_VHOST` | 虚拟主机，Compose 默认 `kuvibe` |
+| `RABBITMQ_QUEUE` | 持久队列，默认 `kuvibe.billing`；独立数据库使用独立队列，开发并发验收使用 `kuvibe.billing.scale` |
+| `RABBITMQ_PREFETCH` | 消费预取数，默认 `5`，限制消息并发 |
+| `TASK_LOG_RETENTION_DAYS` | 定时任务执行日志保留天数，默认 `30`；分批清理已结束记录 |
+| `TASK_EXECUTION_CONCURRENCY` | 每实例同时执行的调度处理器上限，默认 `2`，范围 `1–4`；RabbitMQ 消费另由 prefetch 限制 |
+| `BILLING_WORKER_ENABLED` | `false` 停止账务消费，用于仅提供 HTTP 的实例；配置恢复与附件清理按各自调度规则执行 |
+
+启用后的 RabbitMQ 故障会保留数据库任务供恢复重投；上线前先执行迁移并确认消息服务健康。后端不使用 `setInterval` 执行业务轮询。
+
 ## 日志
 
 `LOGGER_LOG_LEVELS` 接收逗号分隔的 Nest 日志级别；`LOGGER_JSON`、`LOGGER_COLORS`、`LOGGER_TIMESTAMP`、`LOGGER_COMPACT`、`LOGGER_PREFIX` 和 `LOGGER_DEPTH` 控制控制台日志格式。

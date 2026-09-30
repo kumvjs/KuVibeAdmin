@@ -12,18 +12,19 @@ KuVibeAdmin 原名 Nest AI Boot。项目基于 [KuVibe](https://github.com/kumvj
 - **权限与系统管理**：用户、角色、部门、动态菜单和按钮权限；事务写入、Redis 权限缓存失效与最后管理员保护。
 - **附件管理**：上传策略、私有下载、明确授权的公开图片、业务引用及清理；默认本地存储。
 - **时间与时区**：UTC 时间点存储、用户 IANA 展示偏好、显式业务时区工具与夏令时测试。
+- **任务调度**：`@nestjs/schedule` 在线 cron/时区配置、启停、手动执行和持久化日志；RabbitMQ 消费订单 outbox，保留租约、重试与业务幂等。见[任务调度](docs/modules/task-scheduling.md)。
 - **接口与工程规范**：Swagger/OpenAPI、统一响应、参数校验、traceId、固定 Vben 契约与集成验收。
 - **扩展基础**：WebSocket 基础设施已提供；AI Agents 编排、工具调用与记忆仍在规划中。
 
 ## 技术栈
 
-TypeScript ESM · NestJS 12 · Fastify 5 · PostgreSQL · TypeORM · Redis · pnpm workspace · VitePress。
+TypeScript ESM · NestJS 12 · Fastify 5 · PostgreSQL · TypeORM · Redis · RabbitMQ · pnpm workspace · VitePress。
 
 Vben 兼容基线为 `v5.7.0`，完整 commit 固定在 [upstream.lock.json](contracts/vben/upstream.lock.json)。这不代表对任意 Vben 版本或未经适配的 Mock 前端提供即插即用保证。
 
 ## 快速开始
 
-准备 Node.js 24、pnpm、PostgreSQL 和 Redis：
+准备 Node.js 24、pnpm、PostgreSQL 和 Redis；运行账务 worker 时还需 RabbitMQ：
 
 ```bash
 git clone https://github.com/kumvjs/KuVibeAdmin.git
@@ -32,7 +33,9 @@ pnpm install
 cp packages/backend/.env.example packages/backend/.env.local
 ```
 
-编辑 `packages/backend/.env.local`，配置数据库、Redis 和随机的 `JWT_SECRET` / `REFRESH_TOKEN_SECRET`。创建相应数据库及 schema 后，在**仓库根目录**执行：
+根 pnpm 工作区只管理后端和文档；Vben 按自己的工作区及锁文件独立安装。pnpm 11 固定使用项目内依赖布局，保持本地与 CI 一致。
+
+编辑 `packages/backend/.env.local`，配置数据库、Redis 和随机的 `JWT_SECRET` / `REFRESH_TOKEN_SECRET`。账务 worker 需要设置 `RABBITMQ_ENABLED=true` 及消息节点地址、用户名、密码、虚拟主机；Docker 开发消息服务的宿主机端口为 `5673`，详见[任务调度配置](docs/modules/task-scheduling.md)。创建相应数据库及 schema 后，在**仓库根目录**执行：
 
 ```bash
 pnpm migration:show
@@ -47,12 +50,12 @@ pnpm start:local
 
 ## Docker 运行
 
-Docker 方式可一次运行后端、PostgreSQL 和 Redis：
+Docker 方式可一次运行后端、PostgreSQL、Redis 和 RabbitMQ：
 
 ```bash
 node scripts/docker-init.mjs
 docker compose build backend
-docker compose up -d --wait postgres redis
+docker compose up -d --wait postgres redis rabbitmq
 docker compose run --rm migrate
 docker compose run --rm setup
 docker compose up -d --wait backend

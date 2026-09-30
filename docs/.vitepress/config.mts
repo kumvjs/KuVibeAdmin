@@ -43,6 +43,7 @@ export default defineConfig({
           { text: '系统附件', link: '/modules/attachments' },
           { text: '用户积分', link: '/modules/points' },
           { text: '充值套餐与优惠', link: '/modules/recharge' },
+          { text: '任务调度与 RabbitMQ', link: '/modules/task-scheduling' },
           { text: 'WebSocket', link: '/modules/websocket' },
           { text: 'AI Agents', link: '/modules/ai-agents' },
         ],

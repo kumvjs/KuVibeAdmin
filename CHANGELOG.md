@@ -1,5 +1,17 @@
 # 变更记录
 
+## 1.4.0 — 2026-09-30
+
+- 新增 `@nestjs/schedule` 任务调度：在线维护六段 cron、IANA 时区和启停，手动运行，分页查询执行日志；配置和快照持久化，删除任务保留历史。
+- 新增 Playground“系统管理 → 任务调度”页面及六项管理权限，复用现有登录、动态菜单和 Vben 布局。
+- PostgreSQL 调度键与锁控制跨实例同周期/同处理器执行；单实例并发有界，定时等待去重、公平排队，排队后停用和关闭安全收束。
+- Docker 部署 RabbitMQ 4.3.6-management，独立随机密码、虚拟主机、持久卷和回环管理端口；已有环境可增量补配置并保留凭据。
+- 账务 outbox 改由确认发布和手动确认消费者处理，保留领域幂等、租约、有限重试及资金规则；账务 worker 和附件清理移除 `setInterval`。重连时进程并发仍受 prefetch 约束，超额消息保留 outbox 后补投。
+- 新迁移只新增调度表、执行记录、索引和默认任务；旧数据往返保留，已使用配置/日志拒绝删表回滚。执行日志默认保留30天，分批清理及中断恢复。
+- 修复开发 watch 的 Shell 孤儿和启动监听失败资源清理；根工作区明确后端/文档、Vben独立边界，固定 pnpm 11 项目依赖布局并同步锁文件。前端锁只补缺失的 semver snapshot。
+- 9组真实 PostgreSQL/RabbitMQ/HTTP 集成、跨重连背压、298项后端 Jest、17项前端 Vitest、类型/构建/局部lint、浏览器CRUD/RBAC/日志/主题及文档构建通过；Docker 热重载保持单消费者，RabbitMQ重启保留持久消息并自动恢复。
+- 新增兼容能力，统一 minor：根与 backend 1.3.0 → 1.4.0；前端上游版本、KuVibe release/schema/revision保留。Atlas CLI/lint、生产迁移和真实支付渠道联调未执行，既有账务需求的这些门槛继续保留。
+
 ## 1.3.0 — 2026-09-30
 
 - Swagger 开启时从实际文档导出 `packages/backend/openapi/openapi.json`，供前端本地生成；关闭时不导出，已有快照保留。

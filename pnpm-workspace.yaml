@@ -1,6 +1,10 @@
 packages:
   - docs
-  - packages/*
+  # Vben 维护独立 workspace/catalog/锁文件，不纳入根工作区。
+  - packages/backend
+
+# 保持本地与 CI 相同的依赖布局，避免 pnpm 11 在运行脚本前自动切换。
+virtualStoreType: project
 
 allowBuilds:
   '@hyperjump/json-pointer': true

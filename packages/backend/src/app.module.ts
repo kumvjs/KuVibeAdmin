@@ -1,6 +1,7 @@
 import { ClassSerializerInterceptor, MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ScheduleModule } from '@nestjs/schedule'
 import { CatchEverythingFilter } from './common/filters/catch-everything.filter.js'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js'
 import { TraceMiddleware } from './common/middleware/trace.middleware.js'
@@ -15,11 +16,13 @@ import { BillingModule } from './modules/billing/billing.module.js'
 import { isPlaygroundEnabled } from './modules/playground/playground.constants.js'
 import { PlaygroundModule } from './modules/playground/playground.module.js'
 import { SystemModule } from './modules/system/system.module.js'
+import { TasksModule } from './modules/tasks/tasks.module.js'
 import { TimezoneModule } from './modules/timezone/timezone.module.js'
 import { UploadModule } from './modules/upload/upload.module.js'
 import { UserModule } from './modules/user/user.module.js'
 import { WebsocketModule } from './modules/websocket/websocket.module.js'
 import { DatabaseModule } from './shared/database/database.module.js'
+import { RabbitMqModule } from './shared/rabbitmq/rabbitmq.module.js'
 import { SharedModule } from './shared/shared.module.js'
 
 @Module({
@@ -32,6 +35,8 @@ import { SharedModule } from './shared/shared.module.js'
       load: [...Object.values(config)],
     }),
     SharedModule,
+    ScheduleModule.forRoot(),
+    RabbitMqModule,
     DatabaseModule,
     AuthModule,
     UserModule,
@@ -40,6 +45,7 @@ import { SharedModule } from './shared/shared.module.js'
     AiModule,
     SystemModule,
     UploadModule,
+    TasksModule,
     ...(isPlaygroundEnabled() ? [PlaygroundModule] : []),
     WebsocketModule,
   ],

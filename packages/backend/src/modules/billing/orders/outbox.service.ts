@@ -10,6 +10,24 @@ export interface OutboxLease { id: string, type: string, aggregateId: string, pa
 export class BillingOutboxService {
   constructor(private readonly source: DataSource) {}
 
+  async dueIds(types: string[], count = 100): Promise<string[]> {
+    const rows = await this.source.query(`SELECT id::text FROM biz_billing_outbox WHERE tenant_id=1 AND type=ANY($1) AND available_at<=NOW() AND attempts<10 AND (status='pending' OR (status='processing' AND leased_until<=NOW())) ORDER BY available_at,id LIMIT $2`, [types, Math.max(1, Math.min(count, 100))])
+    // 处理崩溃后已耗尽预算的租约，沿用既有 dead 状态。
+    await this.source.query(`UPDATE biz_billing_outbox SET status='dead',lease_token=NULL,leased_until=NULL,last_error='lease_exhausted' WHERE tenant_id=1 AND type=ANY($1) AND status='processing' AND leased_until<=NOW() AND attempts>=10`, [types])
+    return rows.map((row: { id: string }) => row.id)
+  }
+
+  async claimById(id: string, types: string[]): Promise<OutboxLease | undefined> {
+    if (!/^[1-9]\d{0,18}$/.test(id))
+      return undefined
+    const runner = this.source.createQueryRunner()
+    try {
+      const result = await runner.query(`UPDATE biz_billing_outbox SET status='processing',attempts=attempts+1,lease_token=$3,leased_until=NOW()+INTERVAL '120 seconds' WHERE id=$1 AND tenant_id=1 AND type=ANY($2) AND attempts<10 AND available_at<=NOW() AND (status='pending' OR (status='processing' AND leased_until<=NOW())) RETURNING id::text,type,aggregate_id::text AS "aggregateId",payload,attempts,lease_token AS "leaseToken"`, [id, types, randomUUID()], true)
+      return result.records[0]
+    }
+    finally { await runner.release() }
+  }
+
   async enqueue(manager: EntityManager, type: string, aggregateId: string, businessKey: string, availableAt?: Date, payload: Record<string, string> = {}) {
     if (!manager.queryRunner?.isTransactionActive)
       throw new Error('outbox必须与业务在同一事务写入')

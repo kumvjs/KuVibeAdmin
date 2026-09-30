@@ -35,6 +35,8 @@ const systemPages = [
 
 export const INITIAL_MENUS: SeedMenu[] = [
   { name: 'System', path: '/system', type: MenuType.CATALOG, meta: { title: '系统管理', icon: 'ion:settings-outline', order: 9997 } },
+  { name: 'SystemTasks', parent: 'System', path: '/system/tasks', component: '/system/tasks/index', authCode: 'system:task:list', type: MenuType.MENU, meta: { title: '任务调度', icon: 'lucide:clock', order: 7 } },
+  ...(['create', 'update', 'delete', 'run', 'log'] as const).map((action): SeedMenu => ({ name: `SystemTasks${action}`, parent: 'SystemTasks', authCode: `system:task:${action}`, type: MenuType.BUTTON, meta: { title: ({ create: '新增任务', update: '编辑任务', delete: '删除任务', run: '执行任务', log: '执行日志' })[action] } })),
   ...systemPages.flatMap((page, order): SeedMenu[] => [
     { name: page.name, parent: 'System', path: `/system/${page.key}`, component: `/system/${page.key}/list`, authCode: page.permissions.LIST, type: MenuType.MENU, meta: { title: page.title, icon: page.icon, order } },
     ...([

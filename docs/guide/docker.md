@@ -1,6 +1,6 @@
 # Docker 运行与部署
 
-Docker 配置运行本项目的 NestJS 后端、PostgreSQL 18.6 和 Redis 8。Vben 前端仍独立接入。需要已启动的 Docker Engine / Docker Desktop 和 Docker Compose v2 或更新版本；初始化辅助命令需要 Node.js 24（pnpm 已固定在镜像内部）。
+Docker 配置运行本项目的 NestJS 后端、PostgreSQL 18.6、Redis 8 和 RabbitMQ 4.3.6。Vben playground 可叠加开发覆盖文件运行。需要已启动的 Docker Engine / Docker Desktop 和支持 `!override` 的 Docker Compose v2；初始化辅助命令需要 Node.js 24（pnpm 已固定在镜像内部）。
 
 ## 首次本地启动
 
@@ -9,15 +9,15 @@ Docker 配置运行本项目的 NestJS 后端、PostgreSQL 18.6 和 Redis 8。Vb
 ```bash
 node scripts/docker-init.mjs
 docker compose build backend
-docker compose up -d --wait postgres redis
+docker compose up -d --wait postgres redis rabbitmq
 docker compose run --rm migrate
 docker compose run --rm setup
 docker compose up -d --wait backend
 ```
 
-`node scripts/docker-init.mjs` 从 `.env.docker.example` 创建根目录 `.env`，为 PostgreSQL、Redis、Access Token 和 Refresh Token 各生成独立随机密钥；已有 `.env` 时拒绝覆盖。该文件已被 Git 忽略，且不会进入镜像。容器配置由 Compose 显式注入，不读取宿主机的 `packages/backend/.env.local`。
+`node scripts/docker-init.mjs` 从 `.env.docker.example` 创建根目录 `.env`，为 PostgreSQL、Redis、RabbitMQ、Access Token 和 Refresh Token 各生成独立随机密钥；已有 `.env` 时拒绝覆盖。已有环境运行 `node scripts/docker-init.mjs --rabbitmq`（开发环境追加 `--dev`），仅补齐缺少的 RabbitMQ 配置及空消息密码，保留已有非空凭据和其他配置。该文件已被 Git 忽略，且不会进入镜像。容器配置由 Compose 显式注入，不读取宿主机的 `packages/backend/.env.local`。
 
-只使用 Docker 时，可复制 `.env.docker.example` 为根目录 `.env`，自行填入四个独立随机密钥，然后依次使用 `docker compose build backend`、`docker compose up -d --wait postgres redis`、`docker compose run --rm migrate`、`docker compose run --rm setup`、`docker compose up -d --wait backend`。
+只使用 Docker 时，可复制 `.env.docker.example` 为根目录 `.env`，自行填入五个独立随机密钥，然后依次使用 `docker compose build backend`、`docker compose up -d --wait postgres redis rabbitmq`、`docker compose run --rm migrate`、`docker compose run --rm setup`、`docker compose up -d --wait backend`。
 
 初始化会交互创建管理员，用户名 5–100 位、密码 6–128 位，不提供默认账号密码。`setup` 使用当前环境的空临时文件满足既有脚本读取要求；签名密钥来自 Compose 环境，不依赖容器内生成的密钥。初始化规则和团队迁移提示词见[快速开始](getting-started.md#团队统一使用方式)。
 
@@ -25,6 +25,7 @@ docker compose up -d --wait backend
 
 - 后端：`http://localhost:7001`，API 前缀 `/api`。
 - Swagger：`http://localhost:7001/api-docs`。
+- RabbitMQ 管理界面：`http://localhost:15672`，使用根 `.env` 的 `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` 登录；不提供默认密码。
 - HTTP 健康检查：`http://localhost:7001/api/timezone/getTimezoneOptions`，检查真实响应及 `success` 字段；它验证 HTTP 就绪，不代表每次均探测数据库/Redis 连通性。
 
 本地 Compose 默认 `NODE_ENV=local`，运行编译产物，提供本地 Cookie/HTTP 配置和非生产 Playground，不开启源码监听。修改代码后重新执行 `docker compose build backend` 和 `docker compose up -d --wait backend`。
@@ -38,7 +39,7 @@ docker compose up -d --wait backend
 ```bash
 node scripts/docker-init.mjs --dev
 node scripts/docker-dev.mjs build backend
-node scripts/docker-dev.mjs up -d --wait postgres redis
+node scripts/docker-dev.mjs up -d --wait postgres redis rabbitmq
 node scripts/docker-dev.mjs run --rm migrate
 node scripts/docker-dev.mjs run --rm setup
 node scripts/docker-dev.mjs up -d --wait backend
@@ -56,6 +57,8 @@ node scripts/docker-dev.mjs down
 
 Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要在开发过程中删除数据卷。修改实体不会自动建表，迁移仍显式审查/执行。专用积分测试库与开发库分开，测试不能清理开发用户/账本。
 
+开发 RabbitMQ 的 AMQP 地址为 `127.0.0.1:5673`，管理界面为 `http://localhost:15673`，应用容器使用 `rabbitmq:5672`。两个宿主端口均只绑定回环。已有开发环境先运行 `node scripts/docker-init.mjs --dev --rabbitmq`，再启动 RabbitMQ、重建后端依赖并按迁移审查流程升级；任务后台使用方法见[任务调度](../modules/task-scheduling.md)。
+
 两个API与独立worker的账务并发验证、Linux兼容回归和恢复操作见[账务运维与开发验收](../modules/billing-operations.md)。
 
 `packages/frontend/playground` 的积分、充值与订单页面使用 `compose.dev.frontend.yaml` 加入同一开发项目，入口 `http://localhost:5999`，源码热更新且通过同源 `/api` 访问后端。启动命令和权限说明见[积分与充值前端](../frontend/billing.md)。后续操作包含此前已启动的前端时沿用该覆盖文件，避免将它识别为孤立服务；不要使用 `--remove-orphans` 清理仍在使用的开发服务。
@@ -71,9 +74,13 @@ Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要�
 | `POSTGRES_USER` / `POSTGRES_DB` | 新数据库默认 `ku_vibe_admin` |
 | `POSTGRES_PASSWORD` / `REDIS_PASSWORD` | 必填；数据库、Redis 仅在 Compose 内部网络可达 |
 | `JWT_SECRET` / `REFRESH_TOKEN_SECRET` | 必填、互相独立；重建容器时保留根 `.env` |
+| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` / `RABBITMQ_VHOST` | 消息凭据与虚拟主机，默认用户 `ku_vibe_admin`、虚拟主机 `kuvibe`；密码必填且独立生成 |
+| `RABBITMQ_ENABLED` / `RABBITMQ_PREFETCH` / `RABBITMQ_QUEUE` | Compose 默认开启，预取 5，队列 `kuvibe.billing`；多独立业务库必须配置不同队列 |
+| `DOCKER_RABBITMQ_MANAGEMENT_PORT` | 本地默认 15672、开发默认 15673，始终绑定回环；开发 AMQP 端口通过 `DOCKER_RABBITMQ_PORT` 设置 |
+| `RABBITMQ_IMAGE` | 固定 `rabbitmq:4.3.6-management`，已提供持久卷和健康检查 |
 | `NODE_IMAGE` / `POSTGRES_IMAGE` / `REDIS_IMAGE` | 默认 Node.js 24 Debian slim / PostgreSQL 18.6 bookworm / Redis 8；发布时可固定经过验证的 tag/digest |
 
-数据卷保存 PostgreSQL 数据、Redis AOF、私有附件 `/app/var/attachments` 和公开静态资源 `/app/public`。附件与公开目录独立，应用以 `node` 普通用户运行，新卷从镜像目录继承权限。迁移、setup 工具容器复用后端镜像，不安装开发工具。已有宿主机附件需单独复制至附件卷并保留 `node` 用户权限，同时迁移对应数据库记录。
+数据卷保存 PostgreSQL 数据、Redis AOF、RabbitMQ 消息、私有附件 `/app/var/attachments` 和公开静态资源 `/app/public`。附件与公开目录独立，应用以 `node` 普通用户运行，新卷从镜像目录继承权限。迁移、setup 工具容器复用后端镜像，不安装开发工具。已有宿主机附件需单独复制至附件卷并保留 `node` 用户权限，同时迁移对应数据库记录。
 
 镜像分离编译依赖与生产依赖，仅使用 `packages/backend/pnpm-lock.yaml` 冻结安装，并沿用根 `pnpm-workspace.yaml` 的原生依赖许可。镜像包含编译后的迁移与初始化脚本，以 `node dist/src/main.js` 启动。构建上下文只允许清单、锁文件、配置、源码和健康检查进入，宿主机 `.env`、`node_modules`、历史附件、文档和 Git 数据均被排除。构建缓存与多阶段结构参考 [pnpm Docker 指南](https://pnpm.io/docker)。
 
@@ -90,7 +97,7 @@ docker compose down
 
 `docker compose down` 保留数据卷，下次 `docker compose up -d --wait backend` 会复用数据。`docker compose down -v` 会删除本项目的数据卷，包括数据库和附件，只适合明确需要清空的临时环境。不要因修改 PostgreSQL 密码而重建数据库卷：已有卷不重新应用 `POSTGRES_*` 初始化变量，应先通过数据库管理流程修改凭据，再同步 `.env`。
 
-迁移与初始化属于显式工具命令，不在应用启动或容器重启时自动执行。Compose 等待 PostgreSQL/Redis 健康后启动后端；首次启动必须先完成迁移和 setup。依赖等待采用 [Docker 官方启动顺序规则](https://docs.docker.com/compose/how-tos/startup-order/)。
+迁移与初始化属于显式工具命令，不在应用启动或容器重启时自动执行。Compose 等待 PostgreSQL/Redis/RabbitMQ 健康后启动后端；首次启动必须先完成迁移和 setup。依赖等待采用 [Docker 官方启动顺序规则](https://docs.docker.com/compose/how-tos/startup-order/)。
 
 已有部署升级时，在维护窗口停止后端、备份并确认数据库及附件可恢复，审查待执行迁移后再运行：
 

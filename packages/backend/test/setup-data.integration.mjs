@@ -11,7 +11,7 @@ import { SysRoleEntity } from '../dist/src/modules/system/role/entities/role.ent
 import SysUserRoleEntity from '../dist/src/modules/user/entities/user-role.entity.js'
 import { SysUserEntity } from '../dist/src/modules/user/entities/user.entity.js'
 import { UserRoleService } from '../dist/src/modules/user/user-role/user-role.service.js'
-import { initializeBaseData } from '../dist/src/scripts/setup-data.js'
+import { INITIAL_MENUS, initializeBaseData } from '../dist/src/scripts/setup-data.js'
 import 'reflect-metadata'
 
 test('基础数据完整、最小授权、可重复执行并保护已有数据', async () => {
@@ -34,8 +34,8 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     const ordinary = await roles.findOneByOrFail({ code: 'user' })
     assert.equal(ordinary.isDefault, true)
     assert.equal(await links.count(), 0)
-    assert.equal(await menus.count(), 42)
-    assert.equal((await menus.find()).filter(menu => menu.authCode).length, 38)
+    assert.equal(await menus.count(), INITIAL_MENUS.length)
+    assert.equal((await menus.find()).filter(menu => menu.authCode).length, INITIAL_MENUS.filter(menu => menu.authCode).length)
     const root = await source.getRepository(SysDeptEntity).findOneByOrFail({ id: result.rootDeptId })
     assert.equal(root.pid, null)
     const dept = await menus.findOneByOrFail({ name: 'SystemDept' })
@@ -91,7 +91,7 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
       assert.equal(upgraded.pid, upgradedGroup.id)
       assert.deepEqual(upgraded.meta, permission.meta)
     }
-    assert.equal(await menus.count(), 43)
+    assert.equal(await menus.count(), INITIAL_MENUS.length + 1)
     assert.equal(await source.getRepository(SysDeptEntity).count(), 1)
     assert.equal(await roles.count(), 2)
     assert.deepEqual((await links.findBy({ roleId: ordinary.id })).map(link => link.menuId), [business.id])
@@ -103,11 +103,11 @@ test('基础数据完整、最小授权、可重复执行并保护已有数据',
     const superRole = await roles.save({ code: 'super', name: 'super', status: 1, isDefault: false })
     await userRoles.save({ userId: user.id, roleId: superRole.id })
     const routes = await runtime.getAllMenusByUserId(user.id)
-    assert.deepEqual(routes[0].children.map(route => route.name), ['SystemMenu', 'SystemRole', 'SystemUser', 'SystemAttachment', 'SystemPoints', 'SystemBilling', 'SystemDept'])
-    assert.equal(routes[0].children.length, 7)
+    assert.deepEqual(routes[0].children.map(route => route.name), ['SystemMenu', 'SystemRole', 'SystemUser', 'SystemDict', 'SystemAttachment', 'SystemPoints', 'SystemBilling', 'SystemDept'])
+    assert.equal(routes[0].children.length, 8)
     assert.ok((await runtime.getPermissionsByUserId(user.id)).includes('system:attachment:read'))
     await initializeBaseData(source)
-    assert.equal(await menus.count(), 43)
+    assert.equal(await menus.count(), INITIAL_MENUS.length + 1)
 
     // 非旧版根目录归属不应被覆盖。
     await menus.update(attachment.id, { pid: dept.id })

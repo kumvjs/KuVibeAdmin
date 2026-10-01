@@ -1,8 +1,8 @@
-import type { Eligibility, PaymentChannel, PromotionEffect } from '../catalog.types.js'
+import type { ConsecutiveGrantMode, Eligibility, PaymentChannel, PromotionEffect } from '../catalog.types.js'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator'
-import { PAYMENT_CHANNELS, PROMOTION_EFFECTS } from '../catalog.types.js'
+import { MAX_CONSECUTIVE_DAYS, PAYMENT_CHANNELS, PROMOTION_EFFECTS } from '../catalog.types.js'
 
 export class BillingIdDto {
   @ApiProperty({ type: String })
@@ -88,10 +88,31 @@ export class PromotionVersionWriteDto {
   @IsIn(PROMOTION_EFFECTS)
   effect: PromotionEffect
 
-  @ApiProperty({ type: String, description: '减免分数/赠分数量或basis points比例' })
+  @ApiPropertyOptional({ type: String, description: '减免分数/赠分数量或basis points比例；连续赠送使用dailyBonusPoints' })
+  @ValidateIf((object, value) => object.effect !== 'bonus_consecutive' || value !== undefined)
   @IsString()
-  @Matches(/^[1-9]\d{0,18}$/)
-  value: string
+  @Matches(/^(?:0|[1-9]\d{0,18})$/)
+  value?: string
+
+  @ApiPropertyOptional({ minimum: 1, maximum: MAX_CONSECUTIVE_DAYS, description: '连续赠送必填，超过最大天数持续按最后一天额度赠送' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_CONSECUTIVE_DAYS)
+  maxConsecutiveDays?: number
+
+  @ApiPropertyOptional({ type: [String], description: '第1到最大天数的赠送积分，每天可为0，不减免实付金额' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_CONSECUTIVE_DAYS)
+  @Matches(/^(?:0|[1-9]\d{0,18})$/, { each: true })
+  dailyBonusPoints?: string[]
+
+  @ApiPropertyOptional({ enum: ['daily_first', 'every_order'], default: 'daily_first', description: '每天本套餐首笔成功充值赠送，或每笔成功充值赠送；同日不增加连续天数' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['daily_first', 'every_order'])
+  consecutiveGrantMode?: ConsecutiveGrantMode
 
   @ApiPropertyOptional({ enum: ['always', 'first_user', 'first_day'], default: 'always' })
   @IsIn(['always', 'first_user', 'first_day'])
@@ -305,6 +326,12 @@ export class PromotionPageDto {
 }
 
 export class QuoteResponseDto {
+  @ApiProperty({ description: '本次成功充值预计达到的同套餐连续天数，结算重新计算' })
+  consecutiveRechargeDays: number
+
+  @ApiProperty({ description: '本套餐今日是否尚无成功充值，按Asia/Shanghai' })
+  firstPackageRechargeToday: boolean
+
   @ApiProperty({ type: String })
   packageId: string
 

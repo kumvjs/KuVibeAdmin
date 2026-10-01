@@ -4,7 +4,9 @@ import { PG_BIGINT_MAX, positiveInteger } from '../points/points.types.js'
 
 export const PAYMENT_CHANNELS = ['wechat', 'alipay', 'apple', 'google'] as const
 export type PaymentChannel = typeof PAYMENT_CHANNELS[number]
-export const PROMOTION_EFFECTS = ['fixed_discount', 'discount_bps', 'bonus_fixed', 'bonus_bps'] as const
+export const PROMOTION_EFFECTS = ['fixed_discount', 'discount_bps', 'bonus_fixed', 'bonus_bps', 'bonus_consecutive'] as const
+export const MAX_CONSECUTIVE_DAYS = 366
+export type ConsecutiveGrantMode = 'daily_first' | 'every_order'
 export type PromotionEffect = typeof PROMOTION_EFFECTS[number]
 export type Eligibility = 'always' | 'first_user' | 'first_day'
 
@@ -54,10 +56,30 @@ export interface PromotionRules {
   userDailyUses: string | null
   cashBudget: string | null
   pointsBudget: string | null
+  maxConsecutiveDays?: number
+  dailyBonusPoints?: string[]
+  consecutiveGrantMode?: ConsecutiveGrantMode
 }
 
 export function validatePromotion(rules: PromotionRules): PromotionRules {
-  positiveInteger(rules.value, 'value')
+  if (rules.effect === 'bonus_consecutive') {
+    if (!Number.isInteger(rules.maxConsecutiveDays) || rules.maxConsecutiveDays! < 1 || rules.maxConsecutiveDays! > MAX_CONSECUTIVE_DAYS)
+      throw new UnprocessableEntityException(`连续充值最大天数须为1到${MAX_CONSECUTIVE_DAYS}的整数`)
+    if (!Array.isArray(rules.dailyBonusPoints) || rules.dailyBonusPoints.length !== rules.maxConsecutiveDays)
+      throw new UnprocessableEntityException('连续充值须配置每一天的赠送积分，数量须等于最大天数')
+    for (const value of rules.dailyBonusPoints)
+      nonnegativeInteger(value, 'dailyBonusPoints')
+    if (rules.eligibility !== 'always' || !rules.packageIds.length)
+      throw new UnprocessableEntityException('连续充值须绑定套餐，参与条件使用所有充值')
+    if (rules.consecutiveGrantMode !== undefined && !['daily_first', 'every_order'].includes(rules.consecutiveGrantMode))
+      throw new UnprocessableEntityException('连续充值赠送频率无效')
+    rules = { ...rules, value: rules.dailyBonusPoints[0], consecutiveGrantMode: rules.consecutiveGrantMode ?? 'daily_first' }
+  }
+  else {
+    positiveInteger(rules.value, 'value')
+    const { maxConsecutiveDays: _max, dailyBonusPoints: _daily, consecutiveGrantMode: _mode, ...ordinary } = rules
+    rules = ordinary
+  }
   nonnegativeInteger(rules.minimumMinor, 'minimumMinor')
   if (!PROMOTION_EFFECTS.includes(rules.effect) || !['always', 'first_user', 'first_day'].includes(rules.eligibility))
     throw new UnprocessableEntityException('优惠动作或资格类型无效')
@@ -89,8 +111,17 @@ export function validatePromotion(rules: PromotionRules): PromotionRules {
 
 export interface PromotionCandidate { id: string, revision: number, rules: PromotionRules }
 
+export interface ConsecutiveQuoteContext { consecutiveDays: number, firstOfDay: boolean }
+
+export function consecutiveBonus(rules: PromotionRules, context?: ConsecutiveQuoteContext): bigint {
+  if (!context || ((rules.consecutiveGrantMode ?? 'daily_first') === 'daily_first' && !context.firstOfDay))
+    return 0n
+  const index = Math.min(context.consecutiveDays, rules.maxConsecutiveDays!) - 1
+  return BigInt(rules.dailyBonusPoints![index])
+}
+
 /** 纯整数报价；真实预算和首单事实须在下单/结算事务内复核。 */
-export function calculateQuote(price: string, basePoints: string, candidates: PromotionCandidate[]) {
+export function calculateQuote(price: string, basePoints: string, candidates: PromotionCandidate[], context?: ConsecutiveQuoteContext) {
   const original = positiveInteger(price, 'priceMinor')
   const base = positiveInteger(basePoints, 'basePoints')
   const ranked = [...candidates].sort((a, b) => b.rules.priority - a.rules.priority || (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
@@ -98,19 +129,20 @@ export function calculateQuote(price: string, basePoints: string, candidates: Pr
   let cash: PromotionCandidate | null = null
   let bonus: PromotionCandidate | null = null
   let bonusPoints = 0n
+  const fullPrice = candidates.some(item => item.rules.effect === 'bonus_consecutive')
   for (const promotion of ranked) {
     const { rules } = promotion
     if (original < BigInt(rules.minimumMinor))
       continue
     const value = BigInt(rules.value)
     if (rules.effect.startsWith('bonus_')) {
-      const points = rules.effect === 'bonus_fixed' ? value : base * value / 10000n
+      const points = rules.effect === 'bonus_consecutive' ? consecutiveBonus(rules, context) : rules.effect === 'bonus_fixed' ? value : base * value / 10000n
       if (points > bonusPoints) {
         bonusPoints = points
         bonus = promotion
       }
     }
-    else {
+    else if (!fullPrice) {
       const computed = rules.effect === 'fixed_discount' ? original - value : original * value / 10000n
       const amount = computed < 1n ? 1n : computed
       if (amount < payable) {

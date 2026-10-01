@@ -62,6 +62,9 @@ export interface RechargePackage {
   versionId: string;
 }
 export interface Promotion {
+  maxConsecutiveDays?: number;
+  dailyBonusPoints?: string[];
+  consecutiveGrantMode?: 'daily_first' | 'every_order';
   cashBudget: null | string;
   channels: Channel[];
   code: string;
@@ -93,6 +96,8 @@ export interface ChannelProduct {
   versionId: string;
 }
 export interface Quote {
+  consecutiveRechargeDays: number;
+  firstPackageRechargeToday: boolean;
   basePoints: string;
   channel: Channel;
   currency: null | string;

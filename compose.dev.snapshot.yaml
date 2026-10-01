@@ -1,0 +1,21 @@
+# 桌面目录无法共享给 Docker 时使用镜像内源码；修改后 build + up 更新。
+# 必须放在 compose.dev.frontend.yaml 之后；保留同一项目、配置和命名数据卷。
+services:
+  backend:
+    volumes: !override
+      - attachments:/app/var/attachments
+      - public:/app/public
+      - billing-secrets:/app/secrets/billing:ro
+  migrate:
+    volumes: !override
+      - attachments:/app/var/attachments
+      - public:/app/public
+  setup:
+    volumes: !override
+      - attachments:/app/var/attachments
+      - public:/app/public
+  frontend:
+    volumes: !reset []
+
+volumes:
+  billing-secrets:

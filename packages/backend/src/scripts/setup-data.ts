@@ -6,6 +6,7 @@ import { ORDER_PERMISSIONS } from '../modules/billing/orders/order.types.js'
 import { POINT_PERMISSIONS } from '../modules/billing/points/points.types.js'
 import { DEPT_PERMISSIONS, DeptStatus } from '../modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '../modules/system/dept/entities/dept.entity.js'
+import { DICT_PERMISSIONS } from '../modules/system/dict/dict.types.js'
 import { SysMenuEntity } from '../modules/system/menu/entities/menu.entity.js'
 import { MENU_PERMISSIONS, MenuStatus, MenuType } from '../modules/system/menu/menu.types.js'
 import SysRoleMenuEntity from '../modules/system/role/entities/role-menu.entity.js'
@@ -31,6 +32,7 @@ const systemPages = [
   { key: 'menu', name: 'SystemMenu', title: '菜单管理', icon: 'mdi:menu', permissions: MENU_PERMISSIONS },
   { key: 'role', name: 'SystemRole', title: '角色管理', icon: 'mdi:account-group', permissions: ROLE_PERMISSIONS },
   { key: 'user', name: 'SystemUser', title: '用户管理', icon: 'mdi:user', permissions: SYS_USER_PERMISSIONS },
+  { key: 'dict', name: 'SystemDict', title: '字典管理', icon: 'lucide:book-open', permissions: DICT_PERMISSIONS },
 ]
 
 export const INITIAL_MENUS: SeedMenu[] = [

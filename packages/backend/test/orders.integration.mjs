@@ -192,7 +192,7 @@ test('停用用户超时补偿仍执行；已发起支付只能进入关单确�
 })
 
 test('M3迁移保留既有用户与积分，空表往返、非空拒绝down、实体diff为空', async () => {
-  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,system,upload}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog,orders}/**/*.entity.js'] }).initialize()
+  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,upload}/**/*.entity.js', 'dist/src/modules/system/{dept,menu,role,sys-user,log}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog,orders}/**/!(recharge-package-streak).entity.js'] }).initialize()
   const runner = fixture.createQueryRunner()
   try {
     await runner.startTransaction()

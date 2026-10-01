@@ -15,3 +15,5 @@
 
 !packages/backend/types/
 !packages/backend/types/**
+!packages/backend/test/
+!packages/backend/test/**

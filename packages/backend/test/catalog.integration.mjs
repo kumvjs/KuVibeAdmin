@@ -107,7 +107,7 @@ test('内购固定SKU权益，价格由商店决定；首单事实不能重置',
 })
 
 test('M2迁移旧数据不变，空表往返，有数据拒绝回滚，实体diff为空', async () => {
-  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', entities: ['dist/src/modules/{auth,user,system,upload}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog}/**/*.entity.js'], migrations: [] }).initialize()
+  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', entities: ['dist/src/modules/{auth,user,upload}/**/*.entity.js', 'dist/src/modules/system/{dept,menu,role,sys-user,log}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog}/**/!(recharge-package-streak).entity.js'], migrations: [] }).initialize()
   const runner = fixture.createQueryRunner()
   try {
     await runner.startTransaction()

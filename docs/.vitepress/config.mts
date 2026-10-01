@@ -41,6 +41,7 @@ export default defineConfig({
           { text: '认证与 RBAC', link: '/modules/auth-rbac' },
           { text: '数据与缓存', link: '/modules/data-cache' },
           { text: '系统附件', link: '/modules/attachments' },
+          { text: '系统字典', link: '/modules/dictionary' },
           { text: '用户积分', link: '/modules/points' },
           { text: '充值套餐与优惠', link: '/modules/recharge' },
           { text: 'WebSocket', link: '/modules/websocket' },

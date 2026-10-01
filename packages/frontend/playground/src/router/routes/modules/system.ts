@@ -13,6 +13,15 @@ const routes: RouteRecordRaw[] = [
     path: '/system',
     children: [
       {
+        path: 'dict',
+        name: 'SystemDict',
+        meta: {
+          icon: 'lucide:book-open',
+          title: '字典管理',
+        },
+        component: () => import('#/views/system/dict/list.vue'),
+      },
+      {
         path: 'user',
         name: 'SystemUser',
         meta: {

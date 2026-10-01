@@ -186,6 +186,8 @@ onMounted(() => load());
         <p>
           预计活动赠分 {{ points(quote.estimatedBonusPoints) }}，其中保底
           {{ points(quote.guaranteedBonusPoints) }}
+          <br />本套餐本次预计连续充值 {{ quote.consecutiveRechargeDays }} 天；
+          {{ quote.firstPackageRechargeToday ? '今日尚无成功充值' : '今日已有成功充值，同日不增加天数' }}
         </p>
         <p class="billing-muted">{{ quote.notice }}</p>
         <p class="billing-muted">

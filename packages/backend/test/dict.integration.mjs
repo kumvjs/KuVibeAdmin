@@ -11,6 +11,7 @@ import { CatchEverythingFilter } from '../dist/src/common/filters/catch-everythi
 import { TransformInterceptor } from '../dist/src/common/interceptors/transform.interceptor.js'
 import { AddSystemDict1790771566235 } from '../dist/src/migrations/1790771566235-add-system-dict.js'
 import { RbacGuard } from '../dist/src/modules/auth/guards/rbac.guard.js'
+import { DictCacheService } from '../dist/src/modules/system/dict/dict-cache.service.js'
 import { DictController } from '../dist/src/modules/system/dict/dict.controller.js'
 import { DictService } from '../dist/src/modules/system/dict/dict.service.js'
 import { SysDictEntity } from '../dist/src/modules/system/dict/entities/dict.entity.js'
@@ -28,6 +29,7 @@ const config = { type: 'postgres', url: url.href, synchronize: false, migrations
 let admin
 let source
 let service
+let dictCache
 let app
 let sequence = 0
 let permissions = []
@@ -36,13 +38,106 @@ const create = fields => service.create(input(fields), '1')
 const flat = (rootId, fields = {}) => service.list({ rootId, format: 'flat', ...fields })
 const migration = new AddSystemDict1790771566235()
 
+/**
+ * 本用例集不依赖真实 Redis，但按真实键布局实现最小内存缓存，
+ * 以便在真实 PostgreSQL 上同时验证「整树回源」与「一级整树缓存命中」两条读路径。
+ */
+function createMemoryDictCache() {
+  const data = new Map()
+  const redis = {
+    async get(key) {
+      return data.get(key) ?? null
+    },
+    async set(key, value) {
+      data.set(key, value)
+      return 'OK'
+    },
+    async del(...keys) {
+      keys.forEach(key => data.delete(key))
+      return keys.length
+    },
+    /** 与 dict-cache.service.ts 的 INVALIDATE/WRITE 脚本保持同样的键与返回值语义。 */
+    async eval(script, count, ...rest) {
+      const keys = rest.slice(0, count).map(String)
+      const argv = rest.slice(count)
+      const raw = data.get(keys[0])
+      if (script.includes('index.paths')) {
+        if (!raw)
+          return 0
+        const index = JSON.parse(raw)
+        for (let cursor = 0; cursor + 4 < argv.length; cursor += 5) {
+          const expected = String(argv[cursor + 1])
+          const current = index.value.versions[String(argv[cursor])]
+          if (expected === '-') {
+            if (current !== undefined)
+              return 0
+          }
+          else if (String(current) !== expected) {
+            return 0
+          }
+        }
+        for (let cursor = 0; cursor + 4 < argv.length; cursor += 5) {
+          const anchorId = String(argv[cursor])
+          index.value.versions[anchorId] = Number(argv[cursor + 2])
+          const name = String(argv[cursor + 3])
+          if (name)
+            index.value.paths[anchorId] = { pathIds: [anchorId], pathNames: [name] }
+          else
+            delete index.value.paths[anchorId]
+          if (String(argv[cursor + 4]) === '1' && !index.value.roots.includes(anchorId))
+            index.value.roots.push(anchorId)
+        }
+        data.set(keys[0], JSON.stringify(index))
+        return argv.length >= 5 ? Number(argv[2]) : 1
+      }
+      if (!raw)
+        return 0
+      const index = JSON.parse(raw)
+      if (String(index.value.versions[String(argv[0])]) !== String(argv[1]))
+        return 0
+      data.set(keys[1], JSON.stringify({ value: JSON.parse(String(argv[2])) }))
+      return 1
+    },
+  }
+  const cacheService = {
+    getClient: () => redis,
+    setCache: async (key, value) => {
+      await Promise.resolve()
+      data.set(key, JSON.stringify({ value }))
+    },
+    delCache: key => redis.del(key),
+    delCacheByPrefix: async () => {},
+  }
+  return { cache: new DictCacheService(cacheService), store: data }
+}
+
+/** 分别统计整树回源与祖先链查询；整树缓存命中时不应再出现整树递归查询。 */
+function probeSourceQueries() {
+  const original = source.query.bind(source)
+  const probe = { treeQueries: 0, pathQueries: 0 }
+  source.query = (query, ...rest) => {
+    if (typeof query === 'string' && query.includes('WITH RECURSIVE tree'))
+      probe.treeQueries++
+    if (typeof query === 'string' && query.includes('WITH RECURSIVE chain'))
+      probe.pathQueries++
+    return original(query, ...rest)
+  }
+  return {
+    probe,
+    restore: () => {
+      source.query = original
+    },
+  }
+}
+
 before(async () => {
   admin = await new DataSource({ type: 'postgres', url: adminUrl.href }).initialize()
   await admin.query(`CREATE DATABASE "${database}"`)
   source = await new DataSource(config).initialize()
   source.migrations = source.migrations.filter(item => item.name !== migration.name)
   await source.runMigrations()
-  service = new DictService(source.getRepository(SysDictEntity))
+  dictCache = createMemoryDictCache()
+  service = new DictService(source.getRepository(SysDictEntity), dictCache.cache)
 })
 
 after(async () => {
@@ -173,6 +268,8 @@ test('并发互移最多一项成功，删除与新增竞态和重复创建不�
 
 test('真实 PostgreSQL 千层树定点查任意中间节点，flat 可序列化且完整根路径不丢失', async () => {
   await source.query(`INSERT INTO sys_dict(id,pid,name,code) SELECT 9007199254840993 + i, CASE WHEN i=1 THEN NULL ELSE 9007199254840993 + i-1 END, '层级' || i, 'deep.node_' || i FROM generate_series(1,1000) i`)
+  // 绕过 Service 直接写库：按缓存契约显式失效，等价于管理端写入后的处理。
+  await dictCache.cache.invalidate({ bumpedRoots: [{ id: '9007199254840994', name: '层级1', renamed: false, root: true }] })
   const rows = await service.list({ rootCode: 'deep.node_500', includeSelf: true, format: 'flat' })
   assert.equal(rows.length, 501)
   assert.equal(rows[0].depth, 500)
@@ -181,6 +278,47 @@ test('真实 PostgreSQL 千层树定点查任意中间节点，flat 可序列化
   assert.equal(rows.at(-1).pathIds[0], '9007199254840994')
   assert.doesNotThrow(() => JSON.stringify(rows))
   await assert.rejects(service.update('9007199254840994', { pid: rows.at(-1).id }, '1'), /循环/)
+})
+
+test('缓存层对读接口透明：一级整树命中后不再查库，写入后立即失效', async () => {
+  const root = await create()
+  const branch = await create({ pid: root.id })
+  const child = await create({ pid: branch.id, value: 'v1' })
+  // 预热该一级整树、路径索引与版本索引，再统计查询次数。
+  assert.equal((await service.detail(child.id)).value, 'v1')
+  assert.deepEqual((await flat(root.id)).map(row => row.id), [branch.id, child.id])
+  assert.deepEqual(await flat(child.id), [])
+  const warm = probeSourceQueries()
+  try {
+    assert.equal((await service.detail(child.id)).value, 'v1')
+    assert.deepEqual((await flat(root.id)).map(row => row.id), [branch.id, child.id])
+    assert.deepEqual(await flat(child.id), [])
+    // 整树缓存命中：详情、全树与定点查询都不再回源整树递归。
+    assert.equal(warm.probe.treeQueries, 0)
+    assert.ok(warm.probe.pathQueries <= 3)
+  }
+  finally {
+    warm.restore()
+  }
+  // 通过 Service 写入后缓存失效，下一次读取必须回源并拿到新值。
+  await service.update(child.id, { value: 'v2' }, '1')
+  const afterWrite = probeSourceQueries()
+  try {
+    assert.equal((await service.detail(child.id)).value, 'v2')
+    assert.ok(afterWrite.probe.treeQueries > 0)
+  }
+  finally {
+    afterWrite.restore()
+  }
+})
+
+test('缓存清空后读路径按未命中重建索引，不返回陈旧数据也不报错', async () => {
+  const root = await create()
+  const child = await create({ pid: root.id, value: 'fresh' })
+  assert.equal((await service.detail(child.id)).value, 'fresh')
+  dictCache.store.clear()
+  assert.equal((await service.detail(child.id)).value, 'fresh')
+  assert.deepEqual((await flat(root.id)).map(row => row.id), [child.id])
 })
 
 test('初始化补齐字典菜单及权限、重复执行保持用户元数据且不给普通角色管理权限', async () => {

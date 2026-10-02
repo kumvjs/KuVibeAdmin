@@ -1,6 +1,6 @@
 {
   "name": "kuvibe-admin",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "基于 KuVibe 的 AI 友好 NestJS 后端底座，面向 Vben Admin 管理系统",
   "scripts": {
     "docker:init:dev": "node scripts/docker-init.mjs --dev",

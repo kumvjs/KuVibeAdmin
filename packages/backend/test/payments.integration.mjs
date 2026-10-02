@@ -258,7 +258,7 @@ test('已启动的未知状态关单不释放；确认closed才释放；迟到�
 })
 
 test('M4迁移保留历史积分与订单，空表往返、非空拒绝down、实体diff为空', async () => {
-  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,system,upload}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog,orders,payments}/**/*.entity.js'] }).initialize()
+  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,upload}/**/*.entity.js', 'dist/src/modules/system/{dept,menu,role,sys-user,log}/**/*.entity.js', 'dist/src/modules/billing/{points,catalog,orders,payments}/**/!(recharge-package-streak).entity.js'] }).initialize()
   const runner = fixture.createQueryRunner()
   try {
     await runner.startTransaction()

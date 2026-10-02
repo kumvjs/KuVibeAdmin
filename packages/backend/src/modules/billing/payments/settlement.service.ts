@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm'
 import type { ApplicablePromotion } from '../catalog/catalog.service.js'
+import type { ConsecutiveQuoteContext } from '../catalog/catalog.types.js'
 import type { ProviderPayment } from './payment.types.js'
 import { ConflictException, Injectable } from '@nestjs/common'
 import { DataSource } from 'typeorm'
@@ -10,6 +11,7 @@ import { calculateQuote } from '../catalog/catalog.types.js'
 import { CouponEntity, PromotionVersionEntity } from '../catalog/entities/promotion.entity.js'
 import { RechargeUserDayEntity, RechargeUserStateEntity } from '../catalog/entities/recharge-user-state.entity.js'
 import { QuotaService } from '../catalog/quota.service.js'
+import { nextRechargeStreak, readRechargeStreak, saveRechargeStreak } from '../catalog/recharge-streak.js'
 import { OrderReservationEntity } from '../orders/entities/order-reservation.entity.js'
 import { RechargeOrderEntity } from '../orders/entities/recharge-order.entity.js'
 import { OrdersService } from '../orders/orders.service.js'
@@ -78,12 +80,13 @@ export class SettlementService {
         await this.review(manager, order, inboxId, 'late_payment_after_local_close')
         return { status: 'review' }
       }
-      const [{ now }] = await manager.query('SELECT NOW() AS now')
+      const [{ now }] = await manager.query('SELECT clock_timestamp() AS now')
       const date = getBusinessDate('Asia/Shanghai', now)
+      const streak = nextRechargeStreak(await readRechargeStreak(manager, order.userId, order.packageId), date)
       await manager.getRepository(RechargeUserDayEntity).createQueryBuilder().insert().values({ userId: order.userId, businessDate: date }).orIgnore().execute()
       const day = await manager.getRepository(RechargeUserDayEntity).findOneByOrFail({ userId: order.userId, businessDate: date, tenantId: '1' })
       await this.catalog.lockPackage(manager, order.packageId, 'pessimistic_read')
-      const bonusPoints = await this.bonus(manager, order, date, now, !state.firstOrderId, !day.firstOrderId)
+      const bonusPoints = await this.bonus(manager, order, date, now, !state.firstOrderId, !day.firstOrderId, streak)
       const reservations = await manager.getRepository(OrderReservationEntity).findBy({ orderId: id, status: 'held' })
       await this.quotas.finish(manager, reservations, 'consume')
       for (const reservation of reservations)
@@ -94,12 +97,13 @@ export class SettlementService {
       const gift = giftAmount === '0' ? null : await grant(giftAmount, 'gift')
       await transactions.insert({ orderId: id, channel: payment.channel, transactionKey: payment.transactionKey, facts: payment, inboxId, bonusPoints })
       await manager.getRepository(RechargeOrderEntity).update(id, { status: 'paid', settledAt: now, paidLedgerId: paid.id, giftLedgerId: gift?.id ?? null })
+      await saveRechargeStreak(manager, order.userId, order.packageId, streak)
       await manager.getRepository(RechargeUserStateEntity).update(state.id, { settlementSequence: (BigInt(state.settlementSequence) + 1n).toString(), firstOrderId: state.firstOrderId ?? id, ...(state.currentOrderId === id ? { currentOrderId: null } : {}) })
       if (!day.firstOrderId)
         await manager.getRepository(RechargeUserDayEntity).update(day.id, { firstOrderId: id })
       if (order.channel === 'google' && inboxId)
         await this.outbox.enqueue(manager, 'google_consume', inboxId, `order:${id}:consume`)
-      await this.orders.event(manager, id, 'settled', null, '验真、交易去重、额度核销、积分入账与首单事实同事务提交')
+      await this.orders.event(manager, id, 'settled', null, `验真、额度核销、积分与成功事实同事务提交；本套餐${date}连续充值${streak.consecutiveDays}天，${streak.firstOfDay ? '当日首笔' : '当日再次充值'}`)
       await this.done(manager, inboxId)
       return { status: 'paid' }
     })
@@ -114,11 +118,11 @@ export class SettlementService {
     return payment.productId === order.snapshot.productId && payment.bindingToken === attempt.storeToken && (order.channel !== 'google' || payment.storeAccountId === binding.storeAccountId)
   }
 
-  private async bonus(manager: EntityManager, order: RechargeOrderEntity, date: string, now: Date, firstUser: boolean, firstDay: boolean) {
+  private async bonus(manager: EntityManager, order: RechargeOrderEntity, date: string, now: Date, firstUser: boolean, firstDay: boolean, streak: ConsecutiveQuoteContext) {
     let points = order.snapshot.guaranteedBonusPoints
     let candidates = order.snapshot.conditionalBonuses.filter(item => item.rules.eligibility === 'always' || (item.rules.eligibility === 'first_user' ? firstUser : firstDay))
       .filter(item => new Date(item.startsAt) <= now && new Date(item.endsAt) > now)
-      .map(item => ({ item, points: calculateQuote(order.snapshot.priceMinor, order.snapshot.basePoints, [item]).bonusPoints }))
+      .map(item => ({ item, points: calculateQuote(order.snapshot.priceMinor, order.snapshot.basePoints, [item], streak).bonusPoints }))
       .filter(item => BigInt(item.points) > BigInt(points))
       .sort((a, b) => BigInt(a.points) === BigInt(b.points) ? b.item.rules.priority - a.item.rules.priority || (BigInt(a.item.id) < BigInt(b.item.id) ? -1 : 1) : BigInt(a.points) > BigInt(b.points) ? -1 : 1)
     const coupons = new Map<string, CouponEntity>()

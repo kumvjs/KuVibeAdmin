@@ -6,12 +6,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import { Button, message } from 'antdv-next';
 
-import {
-  getPromotions,
-  issueCoupon,
-  publishPromotion,
-  savePromotion,
-} from '#/api/billing';
+import { getPromotions, issueCoupon, publishPromotion, savePromotion } from '#/api/billing';
 import { promotionFields } from '#/views/billing/fields';
 import FormEditor from '#/views/billing/form-editor.vue';
 import { can, points, time, useTask } from '#/views/billing/helpers';
@@ -26,6 +21,7 @@ const { busy, error, run } = useTask();
 const effects: Record<string, string> = {
   bonus_bps: '比例赠分',
   bonus_fixed: '固定赠分',
+  bonus_consecutive: '连续充值赠送',
   discount_bps: '折扣',
   fixed_discount: '直减',
 };
@@ -90,19 +86,26 @@ function edit(row?: Promotion) {
   editor.value = true;
 }
 async function commit(body: Body) {
-  if (
-    body.eligibility !== 'always' &&
-    !String(body.effect).startsWith('bonus_')
-  )
+  if (body.effect === 'bonus_consecutive') {
+    if (!Array.isArray(body.packageIds) || !body.packageIds.length)
+      throw new Error('连续充值赠送须填写适用套餐ID，各套餐独立统计连续天数');
+    if (
+      !Array.isArray(body.dailyBonusPoints) ||
+      body.dailyBonusPoints.length !== body.maxConsecutiveDays
+    )
+      throw new Error('请设置最大天数及对应每一天的赠送积分');
+    body.eligibility = 'always';
+    body.minimumMinor = '0';
+    body.requiresCoupon = false;
+    body.cashBudget = null;
+  }
+  if (body.eligibility !== 'always' && !String(body.effect).startsWith('bonus_'))
     throw new Error('首单活动仅支持赠分');
   return savePromotion(body, selected.value?.id);
 }
 async function publish(row: Promotion) {
   await run(async () => {
-    await publishPromotion(
-      row.id,
-      row.status === 'enabled' ? 'disabled' : 'enabled',
-    );
+    await publishPromotion(row.id, row.status === 'enabled' ? 'disabled' : 'enabled');
   });
   if (!error.value) await load();
 }
@@ -118,7 +121,7 @@ onMounted(() => load());
     <header class="billing-toolbar">
       <div>
         <h1>优惠活动与券</h1>
-        <p class="billing-muted">配置首单、折扣、满额优惠、赠分及严格预算。</p>
+        <p class="billing-muted">配置首单、连续充值赠送、折扣、赠分及预算。</p>
       </div>
       <div class="billing-actions">
         <Button :loading="busy" @click="load()">刷新</Button><Button
@@ -149,8 +152,20 @@ onMounted(() => load());
               {{ row.title }}<br /><span class="billing-muted">#{{ row.id }} · {{ row.code }} · v{{ row.revision }}</span>
             </td>
             <td>
-              {{ effects[row.effect] }} {{ row.value }}<br /><span
-                class="billing-muted"
+              <template v-if="row.effect === 'bonus_consecutive'">
+                连续充值赠送 · 最多 {{ row.maxConsecutiveDays }} 天<br />
+                {{
+                  row.dailyBonusPoints
+                    ?.map((value, index) => `第${index + 1}天 ${points(value)}积分`)
+                    .join('；')
+                }}<br />
+                <span class="billing-muted"
+                  >{{ row.consecutiveGrantMode === 'every_order' ? '每单赠送' : '每天首笔赠送' }} ·
+                  超出按最后一天赠送 · 实付不减免</span
+                >
+              </template>
+              <template v-else>{{ effects[row.effect] }} {{ row.value }}</template
+              ><br /><span class="billing-muted"
                 >{{ eligibility[row.eligibility]
                 }}{{ row.requiresCoupon ? ' · 需要券码' : '' }}</span>
             </td>
@@ -214,7 +229,7 @@ onMounted(() => load());
       :fields="fields"
       :initial="selected as unknown as Body"
       :commit="commit"
-      notice="首单资格按成功入账判断，退款不恢复；同类优惠择优不叠加。内购仅参加符合规则的赠分活动，不使用站内现金券。"
+      notice="首单和连续天数按成功入账判断，退款不恢复；连续活动实付按套餐定价，只赠送积分，同类赠分择优。内购价格由商店决定。"
       @saved="load()"
     />
     <FormEditor

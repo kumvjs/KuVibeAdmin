@@ -104,7 +104,7 @@ export class OrdersService {
         productId: product?.productId ?? null,
         cashPromotion: cash,
         guaranteedBonus: bonus,
-        conditionalBonuses: candidates.filter(item => iap || item.rules.eligibility !== 'always'),
+        conditionalBonuses: candidates.filter(item => iap || item.rules.eligibility !== 'always' || item.rules.effect === 'bonus_consecutive'),
         couponId: (cash ?? bonus)?.couponId ?? null,
       }
       const order = await manager.getRepository(RechargeOrderEntity).save({

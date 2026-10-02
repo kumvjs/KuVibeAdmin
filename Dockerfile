@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 ARG NODE_IMAGE=node:24-bookworm-slim
 
 FROM ${NODE_IMAGE} AS dependencies
@@ -19,6 +18,7 @@ COPY packages/backend/types ./types
 RUN pnpm build
 
 FROM build AS development
+COPY --chown=node:node packages/backend/test ./test
 COPY --chown=node:node docker/healthcheck.mjs ./docker/healthcheck.mjs
 RUN mkdir -p var/attachments public \
     && chown node:node /app /app/var /app/var/attachments /app/public \

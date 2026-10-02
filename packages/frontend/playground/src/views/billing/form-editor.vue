@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Body } from '#/api/billing';
 
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import { Button, Modal } from 'antdv-next';
 
@@ -13,6 +13,7 @@ export interface Field {
   type?:
     | 'boolean'
     | 'datetime'
+    | 'daily-bonuses'
     | 'integer'
     | 'limit'
     | 'list'
@@ -27,6 +28,9 @@ export interface Field {
   options?: { label: string; value: string }[];
   positive?: boolean;
   required?: boolean;
+  min?: number;
+  max?: number;
+  visible?: (values: Record<string, boolean | string | string[]>) => boolean;
 }
 const props = defineProps<{
   commit: (body: Body) => Promise<unknown>;
@@ -41,6 +45,12 @@ const emit = defineEmits<{
   'update:open': [value: boolean];
 }>();
 const values = reactive<Record<string, boolean | string | string[]>>({});
+const visibleFields = computed(() =>
+  props.fields.filter((field) => !field.visible || field.visible(values)),
+);
+const bonusDayCount = computed(() =>
+  Math.max(0, Math.min(366, Math.trunc(Number(values.maxConsecutiveDays) || 0))),
+);
 const busy = ref(false);
 const failure = ref('');
 watch(
@@ -52,16 +62,14 @@ watch(
       const value = props.initial?.[field.key] ?? field.default;
       if (field.type === 'datetime' && typeof value === 'string' && value) {
         const date = new Date(value);
-        values[field.key] = new Date(
-          date.getTime() - date.getTimezoneOffset() * 60_000,
-        )
+        values[field.key] = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
           .toISOString()
           .slice(0, 16);
       } else if (field.type === 'money')
         values[field.key] = value === undefined ? '' : money(String(value));
       else if (field.type === 'list')
         values[field.key] = Array.isArray(value) ? value.join(',') : '';
-      else if (field.type === 'multi')
+      else if (field.type === 'multi' || field.type === 'daily-bonuses')
         values[field.key] = Array.isArray(value) ? [...value] : [];
       else if (field.type === 'boolean') values[field.key] = value === true;
       else
@@ -71,13 +79,18 @@ watch(
   },
   { immediate: true },
 );
+watch(bonusDayCount, (count) => {
+  if (!props.fields.some((field) => field.type === 'daily-bonuses')) return;
+  const previous = Array.isArray(values.dailyBonusPoints) ? values.dailyBonusPoints : [];
+  values.dailyBonusPoints = Array.from({ length: count }, (_, index) => previous[index] ?? '0');
+});
 async function save() {
   if (busy.value) return;
   busy.value = true;
   failure.value = '';
   try {
     const body: Body = {};
-    for (const field of props.fields) {
+    for (const field of visibleFields.value) {
       const value = values[field.key];
       const text = typeof value === 'string' ? value.trim() : '';
       if (
@@ -86,6 +99,10 @@ async function save() {
       )
         throw new Error(`请填写${field.label}`);
       switch (field.type) {
+        case 'daily-bonuses': {
+          body[field.key] = Array.isArray(value) ? value.map((item) => integer(item)) : [];
+          break;
+        }
         case 'boolean': {
           body[field.key] = value === true;
           break;
@@ -118,8 +135,10 @@ async function save() {
         }
         case 'number': {
           const n = Number(text);
-          if (!Number.isSafeInteger(n) || Math.abs(n) > 100_000)
-            throw new Error(`${field.label}须为-100000到100000内的整数`);
+          const min = field.min ?? -100_000;
+          const max = field.max ?? 100_000;
+          if (!Number.isSafeInteger(n) || n < min || n > max)
+            throw new Error(`${field.label}须为${min}到${max}内的整数`);
           body[field.key] = n;
           break;
         }
@@ -151,15 +170,29 @@ async function save() {
   >
     <p v-if="notice" class="billing-muted mb-4">{{ notice }}</p>
     <form class="billing-form" @submit.prevent="save">
-      <label
-        v-for="field in fields"
+      <component
+        :is="field.type === 'daily-bonuses' ? 'div' : 'label'"
+        v-for="field in visibleFields"
         :key="field.key"
         class="billing-field"
-        :class="{ 'billing-full': field.type === 'textarea' }"
+        :class="{ 'billing-full': field.type === 'textarea' || field.type === 'daily-bonuses' }"
       >
         <span>{{ field.label }}{{ field.required ? ' *' : '' }}</span>
+        <div v-if="field.type === 'daily-bonuses'" class="billing-form">
+          <label v-for="day in bonusDayCount" :key="day" class="billing-field">
+            <span>第 {{ day }} 天赠送积分</span>
+            <input
+              v-model="(values[field.key] as string[])[day - 1]"
+              class="billing-input"
+              type="text"
+              inputmode="numeric"
+              required
+              :disabled="busy"
+            />
+          </label>
+        </div>
         <input
-          v-if="field.type === 'boolean'"
+          v-else-if="field.type === 'boolean'"
           v-model="values[field.key] as boolean"
           type="checkbox"
           :disabled="busy"
@@ -205,7 +238,7 @@ async function save() {
           :disabled="busy"
         />
         <span v-if="field.hint" class="billing-muted">{{ field.hint }}</span>
-      </label>
+      </component>
       <p v-if="failure" role="alert" class="billing-error billing-full">
         {{ failure }}
       </p>

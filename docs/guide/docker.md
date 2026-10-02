@@ -61,6 +61,23 @@ Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要�
 
 两个API与独立worker的账务并发验证、Linux兼容回归和恢复操作见[账务运维与开发验收](../modules/billing-operations.md)。
 
+### Docker Desktop 无法共享源码目录
+
+若 Desktop 目录挂载报 `operation not permitted`，在前端覆盖文件之后追加 `compose.dev.snapshot.yaml`，使用镜像内的当前源码；保留相同的独立开发项目、密钥、数据库、Redis、附件和公开资源卷。修改代码后重新构建、重建服务，不采用宿主源码热更新：
+
+```sh
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml build backend frontend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm migrate
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm setup
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml up -d --wait backend frontend
+```
+
+后续 `exec`、`logs`、`ps` 和测试也沿用两个覆盖文件。开发镜像内包含应用测试，生产镜像仍只带生产运行产物；新增配置仅用于开发镜像和目录访问受限环境。
+
+此模式使用 `billing-secrets` 命名卷替代宿主支付配置挂载；需要联调真实渠道时将安全配置和密钥复制到该卷对应的容器路径，再设置 `BILLING_CONFIG_FILE` 并重建后端，仍遵循[支付配置](../modules/recharge.md#微信与支付宝接入)。不配置时渠道继续关闭。
+
+Docker Hub 无法访问而 AWS 公共官方镜像仓库可用时，可在忽略的 `.env.docker.dev` 设置 `NODE_IMAGE=public.ecr.aws/docker/library/node:24-bookworm-slim`。前后端开发镜像均读取此构建参数，默认仍使用 Docker Hub 标签。后端 Dockerfile 使用 Docker 内置构建前端，减少独立拉取 Dockerfile 语法镜像的要求；保留 BuildKit 缓存安装与冻结锁文件。
+
 `packages/frontend/playground` 的积分、充值与订单页面使用 `compose.dev.frontend.yaml` 加入同一开发项目，入口 `http://localhost:5999`，源码热更新且通过同源 `/api` 访问后端。启动命令和权限说明见[积分与充值前端](../frontend/billing.md)。后续操作包含此前已启动的前端时沿用该覆盖文件，避免将它识别为孤立服务；不要使用 `--remove-orphans` 清理仍在使用的开发服务。
 
 覆盖文件的合并方式参见[Docker Compose文档](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/)，只读源码挂载参见[bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)。

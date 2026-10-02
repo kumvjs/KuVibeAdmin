@@ -8,6 +8,8 @@ services:
     build:
       context: ./packages/frontend
       dockerfile: Dockerfile.dev
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
     ports:
       - '127.0.0.1:5999:5999'
     environment:

@@ -17,8 +17,8 @@ for (const file of files.filter(file => file.endsWith('.controller.js'))) {
   const exports = await import(pathToFileURL(resolve('dist/src/modules', file)).href)
   controllers.push(...Object.values(exports).filter(value => typeof value === 'function' && Reflect.hasMetadata('path', value)))
 }
-// SystemModule 对这三个控制器所在模块追加 /system；其余控制器自带完整路径。
-const systemNames = new Set(['DeptController', 'RoleController', 'SysUserController'])
+// SystemModule 对这些控制器所在模块追加 /system；其余控制器自带完整路径。
+const systemNames = new Set(['DeptController', 'DictController', 'RoleController', 'SysUserController'])
 class SystemFixtureModule {}
 Module({ controllers: controllers.filter(controller => systemNames.has(controller.name)) })(SystemFixtureModule)
 const module = await Test.createTestingModule({
@@ -32,7 +32,7 @@ try {
     ? { name: 'KuVibeAdmin', globalPrefix: 'api' }
     : { enable: true, path: 'api-docs', serverUrl: 'http://localhost:7001' } })
   const document = JSON.parse(readFileSync('openapi/openapi.json', 'utf8'))
-  for (const path of ['/system/user/list', '/system/dept/list', '/system/role/list', '/user/info', '/auth/login'])
+  for (const path of ['/system/user/list', '/system/dept/list', '/system/dict/list', '/system/dict/{id}/descendants', '/system/role/list', '/user/info', '/auth/login'])
     assert.ok(document.paths[path], path)
   console.log(`已从 ${controllers.length} 个真实控制器生成测试契约（非运行实例导出）`)
 }

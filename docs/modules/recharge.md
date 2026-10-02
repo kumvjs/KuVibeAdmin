@@ -1,6 +1,6 @@
 # 充值套餐与优惠
 
-当前已实现积分账户、套餐运营、订单创建/查询/取消、四渠道支付验真适配及统一入账。渠道默认关闭，尚未完成真实商户/商店和客户端联调。不能使用报价、客户端支付结果或pending订单作为到账凭证。后端接口及DTO以Swagger为准；当前仓库不包含独立Vben运营页面。
+当前已实现积分账户、套餐运营、订单创建/查询/取消、四渠道支付验真适配及统一入账，并提供仓库内 Vben playground 管理与本人充值页面。渠道默认关闭，尚未完成真实商户/商店和客户端联调。不能使用报价、客户端支付结果或pending订单作为到账凭证。后端接口及DTO以Swagger为准。
 
 ## 套餐与版本
 
@@ -19,6 +19,18 @@ Apple/Google使用固定商品权益。每个渠道、应用、环境、商品ID
 活动可限制渠道、套餐、原价门槛、次数、用户次数、用户每日次数、现金预算和赠分预算。首单仅支持赠分：用户首单和每日首单按服务端成功验真入账判定，退款不恢复资格。首单事实在数据库中禁止重置或删除。
 
 活动改动新增版本。券码仅保存大小写归一后的摘要，可绑定用户、有效期和次数；发放时固定活动版本的优惠权益，运营下调预算仍约束旧券。券有效期须包含在绑定活动的有效期内，未发布或停用的活动不能使用。
+
+## 连续充值赠送
+
+优惠类型 `bonus_consecutive` 按同一用户、同一稳定套餐 ID、北京时间（Asia/Shanghai）的成功入账日统计连续天数。跨渠道和套餐改版继续累计，各套餐独立；同日多笔算一天，断一天后从第 1 天重新开始。待付、失败和取消不计数，退款保留成功事实，不重领当天首笔赠送。
+
+配置最大天数（1–366）及第 1 到最大天数的逐日赠送积分，数量用非负整数字符串，可为 0。超过最大天数持续按最后一天额度赠送。例如设置 3 天及 `["10","20","30"]`，连续第 4 天起仍赠送 30，断充后恢复第 1 天的 10。赠送频率 `consecutiveGrantMode` 可选 `daily_first`（默认，每天本套餐首笔成功充值）或 `every_order`（每笔成功充值）。
+
+连续活动只增加赠送积分，不减免充值金额。活动在订单适用范围内时，微信/支付宝每笔按套餐定价收费，不同时使用现金减免；Apple/Google 扣款由商店决定。连续赠送与其他活动赠分择优一项，套餐原有赠分照常发放。活动未开始、已结束或不适用于该渠道/套餐时，继续原有其他活动规则。
+
+报价提供本次预计连续天数和预计赠分，不承诺名额；真正赠送在验真结算、持有用户锁后重新计算并检查活动有效期和预算。预算不足仍入账基础/套餐赠分并记录成功充值，后续当天订单不能补领已错过的每天首笔资格。活动改版不清除连续天数，已有订单保留活动规则快照；结算事件记录实际业务日和连续天数。
+
+新表 `biz_recharge_package_streak` 保存每用户、套餐最近成功日和连续天数，与订单和积分同事务提交。旧用户缺少状态时从 `settled_at` 和 `paid_ledger_id` 回放历史成功日，包含已退款订单；升级不批量改写旧账本。首次回放使用现有用户订单索引，历史订单极多时需按实际规模评估首笔延迟。
 
 ## 报价与并发额度
 
@@ -96,8 +108,11 @@ node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e 
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/payments.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/iap.integration.mjs
 node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/refunds.integration.mjs
+node scripts/docker-dev.mjs exec -e POINTS_TEST_DATABASE=kuvibe_billing_test -e TYPEORM_DATABASE=kuvibe_billing_test backend node --test test/consecutive-recharge.integration.mjs
 ```
 
 已创建测试库时跳过createdb；按实际`POSTGRES_USER`替换示例用户名。测试保留本次独立业务记录，使用随机业务标识避免跨次互相干扰。覆盖200并发抢每日20份、预算回滚与消费/释放、版本降额保护、券固定权益、内购映射、首单事实保护及迁移往返/旧数据保留/实体diff。并发测试验证一致性，不代表生产吞吐已验收。
 
 新迁移只新增业务表及触发器，不重写现有用户或积分表。有任意套餐/优惠/额度/首单数据时拒绝破坏性down，使用前向修复；必须先运行迁移，再启用新接口。Atlas不可用时只报告已完成的SQL审查和隔离库验证，不能宣称Atlas lint通过。
+
+连续状态迁移 `1790770200000` 仅新增表、唯一索引和外键，不重写旧数据；创建外键会短暂锁定引用表。升级时停止全部旧 API/worker，完成迁移后统一启动新版本，避免旧实例写入成功充值却不更新连续投影。有连续状态时拒绝 down；回退应用也应保留新表并停止连续活动，重新启用前核对旧实例期间的成功订单和状态。

@@ -14,6 +14,7 @@ import { CouponEntity, PromotionEntity, PromotionVersionEntity } from './entitie
 import { PackageVersionEntity, RechargePackageEntity } from './entities/recharge-package.entity.js'
 import { RechargeUserDayEntity, RechargeUserStateEntity } from './entities/recharge-user-state.entity.js'
 import { QuotaService } from './quota.service.js'
+import { nextRechargeStreak, readRechargeStreak } from './recharge-streak.js'
 
 export interface ApplicablePromotion extends PromotionCandidate { versionId: string, couponId: string | null, startsAt: string, endsAt: string }
 export const couponHash = (code: string) => createHash('sha256').update(code.toUpperCase()).digest('hex')
@@ -144,12 +145,13 @@ export class CatalogService {
     const { stable, version } = await this.purchasablePackage(manager, packageId)
     const now = new Date()
     const date = getBusinessDate('Asia/Shanghai', now)
+    const streak = nextRechargeStreak(await readRechargeStreak(manager, userId, packageId), date)
     const state = await manager.getRepository(RechargeUserStateEntity).findOneBy({ tenantId: '1', userId })
     const day = await manager.getRepository(RechargeUserDayEntity).findOneBy({ tenantId: '1', userId, businessDate: date })
     const candidates = await this.applicablePromotions(manager, stable.id, query, userId, now, !state?.firstOrderId, !day?.firstOrderId)
     const always = candidates.filter(item => item.rules.eligibility === 'always')
     const guaranteed = calculateQuote(version.priceMinor, version.basePoints, always)
-    const estimated = calculateQuote(version.priceMinor, version.basePoints, candidates)
+    const estimated = calculateQuote(version.priceMinor, version.basePoints, candidates, streak)
     const iap = ['apple', 'google'].includes(query.channel)
     let product: ChannelProductEntity | null = null
     if (iap) {
@@ -166,6 +168,8 @@ export class CatalogService {
     if (BigInt(version.basePoints) + BigInt(version.giftPoints) + BigInt(estimated.bonusPoints) > PG_BIGINT_MAX)
       throw new UnprocessableEntityException('套餐与活动赠分总额超过bigint范围')
     return {
+      consecutiveRechargeDays: streak.consecutiveDays,
+      firstPackageRechargeToday: streak.firstOfDay,
       packageId,
       versionId: version.id,
       revision: version.revision,
@@ -176,7 +180,7 @@ export class CatalogService {
       packageGiftPoints: version.giftPoints,
       guaranteedBonusPoints: iap ? '0' : guaranteed.bonusPoints,
       estimatedBonusPoints: estimated.bonusPoints,
-      notice: '报价不预占库存或活动预算；首单按服务端验真入账判定，内购价格由商店决定。',
+      notice: '报价不预占库存或活动预算；首单与连续充值按北京时间成功入账重新判定，内购价格由商店决定。连续活动只赠送积分，实付按套餐定价。',
       channelProductId: product?.id ?? null,
       productId: product?.productId ?? null,
       cashPromotionId: guaranteed.cash?.id ?? null,
@@ -287,7 +291,10 @@ export class CatalogService {
       throw new UnprocessableEntityException('活动必须指定开始和结束时间')
     const rules = validatePromotion({
       effect: dto.effect,
-      value: dto.value,
+      value: dto.value ?? '0',
+      maxConsecutiveDays: dto.maxConsecutiveDays,
+      dailyBonusPoints: dto.dailyBonusPoints,
+      consecutiveGrantMode: dto.consecutiveGrantMode,
       eligibility: dto.eligibility,
       channels: dto.channels,
       packageIds: dto.packageIds,

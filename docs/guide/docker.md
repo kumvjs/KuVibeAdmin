@@ -1,10 +1,63 @@
 # Docker 运行与部署
 
-Docker 配置运行本项目的 NestJS 后端、PostgreSQL 18.6、Redis 8 和 RabbitMQ 4.3.6。Vben playground 可叠加开发覆盖文件运行。需要已启动的 Docker Engine / Docker Desktop 和支持 `!override` 的 Docker Compose v2；初始化辅助命令需要 Node.js 24（pnpm 已固定在镜像内部）。
+按「快速本地启动 → 修改后生效 → 生产部署」使用本页。所有命令在仓库根目录执行，需要 Node.js 24、已启动的 Docker Engine / Docker Desktop，以及支持 `!override` / `!reset` 的 Docker Compose。pnpm 已安装在开发镜像中。
 
-## 首次本地启动
+| 场景 | 命令入口 | 环境文件 / 项目 | 前端 |
+| --- | --- | --- | --- |
+| 本地开发（推荐） | `node scripts/docker-dev.mjs -f compose.dev.frontend.yaml …` | `.env.docker.dev` / `kuvibe-admin-dev` | Vite 容器，支持热更新 |
+| 后端编译产物 / 生产 | `docker compose …` | 根 `.env` / `kuvibe-admin` | 不包含前端服务；生产单独发布静态文件 |
 
-在仓库根目录执行：
+两个项目使用独立数据卷，不要混用命令。开发前端启动后，后续操作继续带上 `-f compose.dev.frontend.yaml`。
+
+## 快速本地启动
+
+### 源码热更新开发环境
+
+首次启动完整前后端：
+
+```bash
+# 1. 创建开发配置和随机密钥；已有 .env.docker.dev 时跳过
+node scripts/docker-init.mjs --dev
+
+# 2. 构建前后端
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build backend frontend
+
+# 3. 启动 PostgreSQL、Redis、RabbitMQ
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait postgres redis rabbitmq
+
+# 4. 执行数据库迁移
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm migrate
+
+# 5. 初始化基础数据，交互创建管理员
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm setup
+
+# 6. 启动前后端
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait backend frontend
+```
+
+每一步成功后再执行下一步。登录使用自己创建的管理员，页面示例账号不代表数据库已有该账号。`docker-init` 不覆盖已有配置，容器不读取宿主机 `packages/backend/.env.local`。
+
+| 入口 | 默认地址 |
+| --- | --- |
+| 前端 | `http://localhost:5999` |
+| 后端 / Swagger | `http://localhost:17001` / `http://localhost:17001/api-docs` |
+| RabbitMQ 管理界面 | `http://localhost:15673`，凭据见 `.env.docker.dev` |
+| 宿主 PostgreSQL / Redis / AMQP | `127.0.0.1:55432` / `127.0.0.1:56379` / `127.0.0.1:5673` |
+
+已有环境再次启动直接执行第 6 步；有新迁移时先按后文升级。只开发后端可以去掉前端覆盖文件和 `frontend` 服务名。页面及权限见[积分与充值前端](../frontend/billing.md)。
+
+```bash
+# 状态、日志
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml ps
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml logs -f backend frontend
+
+# 停止并移除容器，保留数据卷
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml down
+```
+
+### 本地运行后端编译产物
+
+需要验证后端运行镜像时使用普通 Compose，不挂载源码：
 
 ```bash
 node scripts/docker-init.mjs
@@ -15,133 +68,263 @@ docker compose run --rm setup
 docker compose up -d --wait backend
 ```
 
-`node scripts/docker-init.mjs` 从 `.env.docker.example` 创建根目录 `.env`，为 PostgreSQL、Redis、RabbitMQ、Access Token 和 Refresh Token 各生成独立随机密钥；已有 `.env` 时拒绝覆盖。已有环境运行 `node scripts/docker-init.mjs --rabbitmq`（开发环境追加 `--dev`），仅补齐缺少的 RabbitMQ 配置及空消息密码，保留已有非空凭据和其他配置。该文件已被 Git 忽略，且不会进入镜像。容器配置由 Compose 显式注入，不读取宿主机的 `packages/backend/.env.local`。
+已有根 `.env` 时跳过初始化配置步骤。默认后端 `http://localhost:7001`、Swagger `http://localhost:7001/api-docs`、RabbitMQ 管理界面 `http://localhost:15672`；数据库和 Redis 不发布宿主端口。
 
-只使用 Docker 时，可复制 `.env.docker.example` 为根目录 `.env`，自行填入五个独立随机密钥，然后依次使用 `docker compose build backend`、`docker compose up -d --wait postgres redis rabbitmq`、`docker compose run --rm migrate`、`docker compose run --rm setup`、`docker compose up -d --wait backend`。
+## 修改后如何生效
 
-初始化会交互创建管理员，用户名 5–100 位、密码 6–128 位，不提供默认账号密码。`setup` 使用当前环境的空临时文件满足既有脚本读取要求；签名密钥来自 Compose 环境，不依赖容器内生成的密钥。初始化规则和团队迁移提示词见[快速开始](getting-started.md#团队统一使用方式)。
+### 修改类型速查
 
-默认访问：
+| 修改内容 | 开发热更新模式 | 编译产物 / 生产模式 |
+| --- | --- | --- |
+| 已挂载的后端 `src`、前端 `playground/src` | 保存后自动编译 / 刷新 | 后端重建镜像；前端重新构建并发布 |
+| 依赖清单、锁文件、Dockerfile | 重建对应镜像和容器 | 同左 |
+| 未挂载的前端共享包、其他构建输入 | 重建前端镜像和容器 | 重新构建并发布前端 |
+| 根环境文件中 Compose 引用的变量 | `up` 重建受影响容器 | 同左 |
+| Compose 配置 | `up` 重建受影响服务，涉及构建时先 `build` | 同左 |
+| 实体 / 数据库结构 | 生成、审查并执行迁移 | 执行已审查的迁移，不在生产生成 |
+| 种子菜单、权限、默认任务 | 停服运行 `setup` | 同左，安排维护窗口 |
 
-- 后端：`http://localhost:7001`，API 前缀 `/api`。
-- Swagger：`http://localhost:7001/api-docs`。
-- RabbitMQ 管理界面：`http://localhost:15672`，使用根 `.env` 的 `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` 登录；不提供默认密码。
-- HTTP 健康检查：`http://localhost:7001/api/timezone/getTimezoneOptions`，检查真实响应及 `success` 字段；它验证 HTTP 就绪，不代表每次均探测数据库/Redis 连通性。
+`build` 更新镜像，`up` 让新镜像和配置生效；仅 `restart` 不会更新镜像或容器环境变量。参见 [Compose up](https://docs.docker.com/reference/cli/docker/compose/up/) 和 [Compose restart](https://docs.docker.com/reference/cli/docker/compose/restart/)。
 
-本地 Compose 默认 `NODE_ENV=local`，运行编译产物，提供本地 Cookie/HTTP 配置和非生产 Playground，不开启源码监听。修改代码后重新执行 `docker compose build backend` 和 `docker compose up -d --wait backend`。
+### 更新前后端容器
 
-## 配置与持久化
-
-### 源码热更新开发环境
-
-开发环境使用独立 Compose 项目 `kuvibe-admin-dev`、根 `.env.docker.dev` 和独立数据卷，默认后端 `http://localhost:17001`、PostgreSQL `127.0.0.1:55432`、Redis `127.0.0.1:56379`。数据库/Redis端口只绑定回环地址，开发密钥与本地/生产配置分开。
-
-```bash
-node scripts/docker-init.mjs --dev
-node scripts/docker-dev.mjs build backend
-node scripts/docker-dev.mjs up -d --wait postgres redis rabbitmq
-node scripts/docker-dev.mjs run --rm migrate
-node scripts/docker-dev.mjs run --rm setup
-node scripts/docker-dev.mjs up -d --wait backend
-```
-
-`setup`交互创建管理员；不提供默认密码。源码和测试以只读bind mount进入容器，Nest watch编译产物写在容器内，Linux依赖不与宿主机node_modules混用。修改源码后自动编译/重启；新增模块目录后，若Windows挂载未触发重载，执行`node scripts/docker-dev.mjs restart backend`并等待编译完成。清单/锁文件或Dockerfile改变后重新build。Windows挂载使用TypeScript轮询监听。
+需要重建时，按实际修改的服务执行下面一组命令：
 
 ```bash
-node scripts/docker-dev.mjs logs -f backend
-node scripts/docker-dev.mjs exec backend pnpm typecheck
-node scripts/docker-dev.mjs exec backend pnpm test --runInBand
-node scripts/docker-dev.mjs ps
-node scripts/docker-dev.mjs down
+# 只更新后端
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build backend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait backend
+
+# 只更新前端
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build frontend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait frontend
+
+# 同时更新前后端（有新迁移时先执行后面的数据库升级）
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml build backend frontend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait backend frontend
 ```
 
-Swagger地址为`http://localhost:17001/api-docs`。`down`保留数据；不要在开发过程中删除数据卷。修改实体不会自动建表，迁移仍显式审查/执行。专用积分测试库与开发库分开，测试不能清理开发用户/账本。
-
-开发 RabbitMQ 的 AMQP 地址为 `127.0.0.1:5673`，管理界面为 `http://localhost:15673`，应用容器使用 `rabbitmq:5672`。两个宿主端口均只绑定回环。已有开发环境先运行 `node scripts/docker-init.mjs --dev --rabbitmq`，再启动 RabbitMQ、重建后端依赖并按迁移审查流程升级；任务后台使用方法见[任务调度](../modules/task-scheduling.md)。
-
-两个API与独立worker的账务并发验证、Linux兼容回归和恢复操作见[账务运维与开发验收](../modules/billing-operations.md)。
-
-### Docker Desktop 无法共享源码目录
-
-若 Desktop 目录挂载报 `operation not permitted`，在前端覆盖文件之后追加 `compose.dev.snapshot.yaml`，使用镜像内的当前源码；保留相同的独立开发项目、密钥、数据库、Redis、附件和公开资源卷。修改代码后重新构建、重建服务，不采用宿主源码热更新：
-
-```sh
-node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml build backend frontend
-node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm migrate
-node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm setup
-node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml up -d --wait backend frontend
-```
-
-后续 `exec`、`logs`、`ps` 和测试也沿用两个覆盖文件。开发镜像内包含应用测试，生产镜像仍只带生产运行产物；新增配置仅用于开发镜像和目录访问受限环境。
-
-此模式使用 `billing-secrets` 命名卷替代宿主支付配置挂载；需要联调真实渠道时将安全配置和密钥复制到该卷对应的容器路径，再设置 `BILLING_CONFIG_FILE` 并重建后端，仍遵循[支付配置](../modules/recharge.md#微信与支付宝接入)。不配置时渠道继续关闭。
-
-Docker Hub 无法访问而 AWS 公共官方镜像仓库可用时，可在忽略的 `.env.docker.dev` 设置 `NODE_IMAGE=public.ecr.aws/docker/library/node:24-bookworm-slim`。前后端开发镜像均读取此构建参数，默认仍使用 Docker Hub 标签。后端 Dockerfile 使用 Docker 内置构建前端，减少独立拉取 Dockerfile 语法镜像的要求；保留 BuildKit 缓存安装与冻结锁文件。
-
-`packages/frontend/playground` 的积分、充值与订单页面使用 `compose.dev.frontend.yaml` 加入同一开发项目，入口 `http://localhost:5999`，源码热更新且通过同源 `/api` 访问后端。启动命令和权限说明见[积分与充值前端](../frontend/billing.md)。后续操作包含此前已启动的前端时沿用该覆盖文件，避免将它识别为孤立服务；不要使用 `--remove-orphans` 清理仍在使用的开发服务。
-
-覆盖文件的合并方式参见[Docker Compose文档](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/)，只读源码挂载参见[bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)。
-
-| 配置 | 默认值 / 行为 |
-| --- | --- |
-| `DOCKER_HTTP_BIND` / `DOCKER_HTTP_PORT` | `127.0.0.1:7001`，仅发布后端；容器内部 `APP_PORT` 固定为 `7001` |
-| `APP_BASE_URL` | 浏览器看到的 API 地址；改宿主机端口时同步修改 |
-| `APP_CORS_ORIGINS` | 默认允许 Vben 的 `localhost:5999`、`localhost:5555`；填准确 Origin |
-| `GLOBAL_PREFIX` | 默认 `api`；健康检查自动沿用，空值表示无前缀 |
-| `POSTGRES_USER` / `POSTGRES_DB` | 新数据库默认 `ku_vibe_admin` |
-| `POSTGRES_PASSWORD` / `REDIS_PASSWORD` | 必填；数据库、Redis 仅在 Compose 内部网络可达 |
-| `JWT_SECRET` / `REFRESH_TOKEN_SECRET` | 必填、互相独立；重建容器时保留根 `.env` |
-| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` / `RABBITMQ_VHOST` | 消息凭据与虚拟主机，默认用户 `ku_vibe_admin`、虚拟主机 `kuvibe`；密码必填且独立生成 |
-| `RABBITMQ_ENABLED` / `RABBITMQ_PREFETCH` / `RABBITMQ_QUEUE` | Compose 默认开启，预取 5，队列 `kuvibe.billing`；多独立业务库必须配置不同队列 |
-| `DOCKER_RABBITMQ_MANAGEMENT_PORT` | 本地默认 15672、开发默认 15673，始终绑定回环；开发 AMQP 端口通过 `DOCKER_RABBITMQ_PORT` 设置 |
-| `RABBITMQ_IMAGE` | 固定 `rabbitmq:4.3.6-management`，已提供持久卷和健康检查 |
-| `NODE_IMAGE` / `POSTGRES_IMAGE` / `REDIS_IMAGE` | 默认 Node.js 24 Debian slim / PostgreSQL 18.6 bookworm / Redis 8；发布时可固定经过验证的 tag/digest |
-
-数据卷保存 PostgreSQL 数据、Redis AOF、RabbitMQ 消息、私有附件 `/app/var/attachments` 和公开静态资源 `/app/public`。附件与公开目录独立，应用以 `node` 普通用户运行，新卷从镜像目录继承权限。迁移、setup 工具容器复用后端镜像，不安装开发工具。已有宿主机附件需单独复制至附件卷并保留 `node` 用户权限，同时迁移对应数据库记录。
-
-镜像分离编译依赖与生产依赖，仅使用 `packages/backend/pnpm-lock.yaml` 冻结安装，并沿用根 `pnpm-workspace.yaml` 的原生依赖许可。镜像包含编译后的迁移与初始化脚本，以 `node dist/src/main.js` 启动。构建上下文只允许清单、锁文件、配置、源码和健康检查进入，宿主机 `.env`、`node_modules`、历史附件、文档和 Git 数据均被排除。构建缓存与多阶段结构参考 [pnpm Docker 指南](https://pnpm.io/docker)。
-
-按用户指定固定 PostgreSQL `18.6`，不使用浮动 `latest`。官方镜像的 PostgreSQL 18 默认 `PGDATA=/var/lib/postgresql/18/docker`，数据卷必须挂载至 `/var/lib/postgresql`；本配置已采用该布局，参见 [PostgreSQL 官方镜像说明](https://hub.docker.com/_/postgres)。
-
-## 日常运行与升级
+普通 Compose 后端更新：
 
 ```bash
-docker compose ps
-docker compose logs -f backend
-docker compose logs postgres redis
-docker compose down
-```
-
-`docker compose down` 保留数据卷，下次 `docker compose up -d --wait backend` 会复用数据。`docker compose down -v` 会删除本项目的数据卷，包括数据库和附件，只适合明确需要清空的临时环境。不要因修改 PostgreSQL 密码而重建数据库卷：已有卷不重新应用 `POSTGRES_*` 初始化变量，应先通过数据库管理流程修改凭据，再同步 `.env`。
-
-迁移与初始化属于显式工具命令，不在应用启动或容器重启时自动执行。Compose 等待 PostgreSQL/Redis/RabbitMQ 健康后启动后端；首次启动必须先完成迁移和 setup。依赖等待采用 [Docker 官方启动顺序规则](https://docs.docker.com/compose/how-tos/startup-order/)。
-
-已有部署升级时，在维护窗口停止后端、备份并确认数据库及附件可恢复，审查待执行迁移后再运行：
-
-```bash
-docker compose stop backend
 docker compose build backend
-docker compose run --rm migrate node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:show
+docker compose up -d --wait backend
+```
+
+只修改根环境配置、无需构建镜像时：
+
+```bash
+# 开发环境 .env.docker.dev
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait --force-recreate backend frontend
+
+# 普通 Compose / 生产 .env
+docker compose up -d --wait --force-recreate backend
+```
+
+前端镜像内的 `.env` 修改需要重建镜像；宿主前端 `.env` 不会自动传入容器。新增后端目录未触发监听时，可以执行 `node scripts/docker-dev.mjs -f compose.dev.frontend.yaml restart backend`。
+
+### 数据库迁移与基础数据
+
+**启动、热更新、重建和重启不会自动执行迁移。** `migrate` 改表结构，`setup` 补基础数据；`TYPEORM_SYNCHRONIZE` 始终为 `false`。
+
+已有新迁移文件时，开发环境按以下顺序执行；升级前备份数据库，每步失败都停止后续操作：
+
+```bash
+# 1. 停止应用写入
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml stop backend
+
+# 2. 依赖或镜像输入有变更时先 build backend
+# 查看迁移状态：工具容器先编译当前源码
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm migrate sh -c 'pnpm build && exec node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:show'
+
+# 3. 执行所有待应用迁移
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm migrate
+
+# 4. 版本涉及基础菜单 / 权限 / 默认任务更新时执行
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm setup
+
+# 5. 恢复服务
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml up -d --wait backend frontend
+```
+
+`migration:show` 的 `[X]` 表示已执行，`[ ]` 表示待执行。开发工具容器会编译挂载源码；普通 Compose 工具使用镜像中的编译迁移，因此普通 Compose 升级必须先构建新后端镜像，见生产升级流程。
+
+修改实体、需要生成迁移时，按[团队统一使用方式](getting-started.md#团队统一使用方式)让 Agent 完成生成、数据保留审查、隔离库验证和部署影响检查。手动生成候选文件的开发命令如下（Bash / zsh）：
+
+```bash
+# 临时给迁移输出目录写权限，生成文件写回仓库
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml run --rm --volume "$PWD/packages/backend/src/migrations:/app/src/migrations" migrate sh -c 'pnpm build && exec node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:generate ./src/migrations/update-table'
+```
+
+该命令比较开发数据库实际结构与当前实体，先确认基线一致。生成成功只得到候选迁移，审查通过再执行。部署已有迁移无需再次生成；容器直接调用 TypeORM CLI 保留 `NODE_ENV`，现有 `pnpm migration:*` 脚本强制使用 `local`，不作为生产入口。
+
+## 生产部署流程
+
+以单机同源 HTTPS 站点 `https://admin.example.com` 为例：宿主 Nginx 托管前端静态文件，代理 `/api` 至 `127.0.0.1:7001`。域名、证书和目录按实际环境替换。
+
+当前没有业务前端生产 Compose 服务；`compose.dev.frontend.yaml` 运行 Vite 开发服务器。生产单独构建 Playground 静态产物，上游 `scripts/deploy` 模板缺少本项目 API 代理，不能直接作为完整业务部署配置。
+
+### 首次部署
+
+**1. 创建根环境配置。** 执行 `node scripts/docker-init.mjs`，编辑根 `.env`，保留生成的五项独立密钥：
+
+```dotenv
+NODE_ENV=production
+DOCKER_HTTP_BIND=127.0.0.1
+DOCKER_HTTP_PORT=7001
+APP_BASE_URL=https://admin.example.com
+APP_CORS_ORIGINS=https://admin.example.com
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAME_SITE=lax
+AUTH_COOKIE_DOMAIN=
+SWAGGER_ENABLE=false
+```
+
+生产不叠加开发覆盖文件。前后端分域时，按真实 API 地址 / 前端 Origin 设置 `APP_BASE_URL` / `APP_CORS_ORIGINS`；跨站 Cookie 使用 `SameSite=none` 并保持 `Secure=true`。
+
+**2. 部署后端和空数据库。** 每步成功后再继续；已有业务库使用下面的升级流程：
+
+```bash
+docker compose build backend
+docker compose up -d --wait postgres redis rabbitmq
 docker compose run --rm migrate
 docker compose run --rm setup
 docker compose up -d --wait backend
 ```
 
-工具容器通过直接调用编译后的 TypeORM CLI 沿用 Compose 的 `NODE_ENV`，避免现有 pnpm migration/setup 脚本强制切换至 local。`TYPEORM_SYNCHRONIZE` 固定为 `false`。时间迁移 `1789648814246` 对历史 UTC 语义、排他锁和生产规模验证的要求仍适用，详细审查与恢复流程见[快速开始](getting-started.md)。新增迁移 `1790744400000` 为 13 张表补齐实体已预留的 `tenant_id bigint NOT NULL DEFAULT 1`，解决全新迁移库无法 setup 的问题。默认值来自现有 `CommonEntity`，不新增租户隔离能力。迁移仍需排他锁；已有列的数据库应先核对实体/迁移历史，不直接重跑或删列绕过冲突。回滚会锁定并检查全部表，发现非 `1` 租户数据时拒绝删列。需要回退应用时保留旧镜像 tag；数据库回滚先验证兼容性，不能直接以旧镜像搭配任意新 schema。
+**3. 构建前端。** 在有 Node.js 和项目所固定 pnpm 的构建机执行（Bash / zsh）：
 
-## 生产环境
-
-部署前在根 `.env` 明确设置：
-
-```dotenv
-NODE_ENV=production
-APP_BASE_URL=https://api.example.com
-APP_CORS_ORIGINS=https://admin.example.com
-AUTH_COOKIE_SECURE=true
-AUTH_COOKIE_SAME_SITE=lax
-SWAGGER_ENABLE=false
+```bash
+pnpm --dir packages/frontend install --frozen-lockfile
+VITE_GLOB_API_URL=/api VITE_KUVIBE_API_URL=/api pnpm --dir packages/frontend/playground build
 ```
 
-所有公开地址和浏览器 Origin 必须使用 HTTPS。由可信反向代理终止 TLS，并将 WebSocket 升级请求及 API 转发至 `127.0.0.1:7001`。若代理在其他容器中，需将其接入本项目网络并转发至 `backend:7001`。前后端跨站时采用 `AUTH_COOKIE_SAME_SITE=none`，继续保持 Secure；Cookie Domain 默认留空。调整网络绑定时只开放所需入口。
+前端使用独立工作区 / 锁文件，产物为 `packages/frontend/playground/dist`。显式覆盖 API 地址避免使用上游示例地址；环境变量在构建时生效，修改后重新构建，见 [Vite 环境变量](https://vite.dev/guide/env-and-mode)。
 
-该配置提供单机部署基础，不代替生产数据库高可用、备份、监控或生产规模迁移演练。本地验收只涉及新建隔离环境，不证明已有生产数据库可直接升级。PostgreSQL 主版本变更需要正式数据升级流程，不能只修改 `POSTGRES_IMAGE`；如果改为 17 或更早版本，也必须按对应官方镜像重新审查数据卷路径。
+**4. 发布静态文件并配置 HTTPS 代理。** 下面以构建与部署在同一台 Linux 主机为例；远程构建时同步同一份 `dist/` 到部署机即可：
+
+```bash
+sudo install -d /srv/kuvibe-admin/frontend
+sudo rsync -a --delete packages/frontend/playground/dist/ /srv/kuvibe-admin/frontend/
+```
+
+该目录只保存构建产物，`--delete` 会移除旧产物。升级前保留上一版静态文件。在已有 HTTPS Nginx `server` 中配置（证书和 TLS 监听按部署环境设置）：
+
+```nginx
+root /srv/kuvibe-admin/frontend;
+index index.html;
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+location = /index.html {
+    add_header Cache-Control "no-cache";
+}
+location /api/ {
+    # 不带末尾斜杠，保留后端 /api 前缀
+    proxy_pass http://127.0.0.1:7001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+`proxy_pass` 不附带 URI 时保留请求路径，见 [Nginx 代理说明](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)。公开资源和 WebSocket 按实际路径增加代理及 Upgrade 配置。代理在另一容器时，将其接入后端网络，目标改为 `backend:7001`。
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+curl --fail https://admin.example.com/api/timezone/getTimezoneOptions
+```
+
+确认 `success=true`，再检查真实登录、刷新 Cookie、菜单及业务读写。HTTP 健康检查不代表完整依赖或业务验收。
+
+### 已有部署升级
+
+先取到已验收版本，审查待执行迁移的旧数据、锁等待、耗时和兼容性，并在隔离数据库演练升级及恢复。先构建新前端、保留上一版产物，后端按下面顺序升级：
+
+```bash
+# 1. 保留旧镜像，提前构建新镜像
+docker image tag kuvibe-admin-backend:local kuvibe-admin-backend:rollback
+docker compose build backend
+
+# 2. 维护窗口暂停入口及所有写入者，停止本项目后端
+docker compose stop backend
+```
+
+**3. 备份并确认可恢复。** 以下为 Bash / zsh 示例；每次使用独立目录，并另行保存支付配置、上一版前端及消息恢复所需资料：
+
+```bash
+umask 077
+backup_dir="/srv/kuvibe-admin/backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+docker compose exec -T postgres sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_dir/database.dump"
+docker compose run --rm --no-deps -T backend tar -czf - -C /app var/attachments public > "$backup_dir/files.tar.gz"
+cp .env "$backup_dir/compose.env"
+```
+
+备份目录含敏感数据，按生产备份策略保存；临时后端容器只运行 `tar`，不启动应用。开发项目备份时，将上述 `docker compose` 替换成带前端覆盖文件的 `node scripts/docker-dev.mjs`，并备份 `.env.docker.dev`。先确认备份成功和恢复演练结果，再继续：
+
+```bash
+# 4. 查看并执行待应用迁移
+docker compose run --rm migrate node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:show
+docker compose run --rm migrate
+
+# 5. 本次版本涉及基础菜单 / 权限 / 默认任务更新时执行
+docker compose run --rm setup
+
+# 6. 恢复后端并检查
+docker compose up -d --wait backend
+docker compose ps
+docker compose logs --tail=100 backend
+```
+
+**7. 发布同版本前端。** 按首次部署的静态文件发布步骤更新，完成 HTTPS / 登录 / 业务检查后再恢复入口。仅前端变更时构建并发布静态文件；无迁移和种子变更的后端更新使用前文 `build` + `up`。
+
+任一步失败都保持维护状态。`setup` 重跑保留已有管理员、补齐基础数据；自定义数据冲突或权限缓存清理失败需处理后重跑，不通过清库绕过。
+
+### 回退与恢复
+
+旧应用兼容当前数据库和消息格式时，可回退后端镜像，再恢复对应前端产物：
+
+```bash
+docker image tag kuvibe-admin-backend:rollback kuvibe-admin-backend:local
+docker compose up -d --wait --force-recreate backend
+```
+
+数据库回退单独审查；以下只回退最近一条迁移，不恢复 `setup` 或业务数据，不作为默认失败处理：
+
+```bash
+# 仅在停服、已备份且确认该 down 可执行时使用
+docker compose run --rm migrate node node_modules/typeorm/cli.js -d dist/src/config/database.config.js migration:revert
+```
+
+不可逆或业务已依赖的新结构采用前向修复，或恢复数据库、文件及匹配应用版本。历史时间迁移需确认旧值时区语义；`tenant_id` 存在非 `1` 数据、任务表已有使用数据时会拒绝结构回退，不能强行删列 / 删表。审查标准见[团队统一使用方式](getting-started.md#团队统一使用方式)。
+
+## 可选模式与配置说明
+
+### Docker Desktop 无法共享源码目录
+
+挂载报 `operation not permitted` 时，在前端覆盖文件后追加 `compose.dev.snapshot.yaml`，使用镜像内源码。首次配置仍先运行 `node scripts/docker-init.mjs --dev`：
+
+```bash
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml build backend frontend
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml up -d --wait postgres redis rabbitmq
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm migrate
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml run --rm setup
+node scripts/docker-dev.mjs -f compose.dev.frontend.yaml -f compose.dev.snapshot.yaml up -d --wait backend frontend
+```
+
+此模式没有宿主源码热更新；代码修改后执行 `build` + `up`，新增迁移时先停服、备份再执行迁移。后续 `logs`、`exec`、测试和迁移查询均沿用两个覆盖文件。手动生成新迁移应在可写的开发环境进行。
+
+支付配置使用 `billing-secrets` 卷；真实渠道联调需复制配置和密钥到容器对应路径，再设置 `BILLING_CONFIG_FILE` 并重建后端，见[支付配置](../modules/recharge.md#微信与支付宝接入)。Docker Hub 不可达而 AWS 官方公共镜像可用时，可在 `.env.docker.dev` 设置 `NODE_IMAGE=public.ecr.aws/docker/library/node:24-bookworm-slim` 后重建。
+
+### 配置和数据保留
+
+- 初始化创建五项独立随机密钥；已有旧配置缺少 RabbitMQ 时，开发运行 `node scripts/docker-init.mjs --dev --rabbitmq`，普通 Compose 运行 `node scripts/docker-init.mjs --rabbitmq`，保留已有非空凭据。容器配置由 Compose 显式注入，根环境文件不进入镜像。
+- PostgreSQL、Redis AOF、RabbitMQ、私有附件 `/app/var/attachments` 和公开资源 `/app/public` 分别持久化。`down` 保留数据；`down -v` 删除数据库、消息和附件等数据卷，不用于日常更新。不要用 `--remove-orphans` 删除仍在使用的前端。
+- 已有 PostgreSQL / RabbitMQ 卷不会因修改初始化环境变量自动修改用户密码；先通过对应服务的凭据管理流程修改，再同步环境配置。JWT 密钥日常重建时保留，轮换单独安排。
+- 后端按 `packages/backend/pnpm-lock.yaml` 冻结安装，前端使用独立锁文件；应用以普通 `node` 用户运行，源码只读，Linux 依赖不与宿主 `node_modules` 混用。旧附件迁入卷需保留数据库记录和文件权限。
+- 默认 Node.js 24 Debian slim、PostgreSQL 18.6-bookworm、Redis 8-bookworm、RabbitMQ 4.3.6-management，可通过对应 `*_IMAGE` 固定已验证的 digest。PostgreSQL 18 卷挂 `/var/lib/postgresql`；主版本升级需要正式数据升级流程，不能只改镜像标签。
+- 容器内后端端口固定 `7001`，外部端口改变时同步 `APP_BASE_URL`。`GLOBAL_PREFIX` 默认 `api`，变更时同步前端与代理。生产仅开放所需入口，RabbitMQ 管理端口保持回环绑定。
+- RabbitMQ 默认开启、预取 5、队列 `kuvibe.billing`；独立业务库使用不同队列。任务和账务恢复见[任务调度](../modules/task-scheduling.md)和[账务运维](../modules/billing-operations.md)。单机配置不替代生产规模迁移、备份恢复、高可用及真实支付渠道验收。

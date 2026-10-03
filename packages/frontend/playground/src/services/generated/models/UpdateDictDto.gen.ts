@@ -6,21 +6,17 @@ export type UpdateDictDto = {
      */
     name?: string;
     /**
-     * 全局唯一编码，小写字母开头，可含数字、点、下划线及短横线
-     */
-    code?: string;
-    /**
-     * 父节点 ID；null 或 0 为根节点
+     * null 或 0 为根节点
      */
     pid?: string | null;
     /**
-     * 节点值；null 清空，空字符串作为有效值保存
+     * null 表示无值，空字符串为有效值；设置后通过停用并新建替换
      */
     value?: string | null;
-    status?: 0 | 1;
     /**
-     * 同级排序，越小越靠前
+     * 允许业务显式缓存此锚点的下级查询
      */
+    cacheEnabled?: boolean;
     order?: number;
     remark?: string | null;
 };

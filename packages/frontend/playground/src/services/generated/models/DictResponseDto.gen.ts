@@ -8,35 +8,16 @@ export type DictResponseDto = {
     value: string | null;
     status: 0 | 1;
     /**
-     * 自身及全部祖先均启用才为 1
+     * 自身及祖先均启用才为 1
      */
     effectiveStatus: 0 | 1;
+    cacheEnabled: boolean;
     order: number;
     remark: string | null;
     createTime: string;
     updateTime: string;
     /**
-     * 根到自身的完整 ID 路径，首尾带 /；ID 保持字符串
-     */
-    fullPathId: string;
-    /**
-     * 名称展示路径；程序消费请使用 pathNames
-     */
-    fullPathName: string;
-    /**
-     * 根到自身的 ID 数组
-     */
-    pathIds: Array<string>;
-    /**
-     * 根到自身的名称数组，可无歧义处理名称包含 / 的情况
-     */
-    pathNames: Array<string>;
-    /**
-     * 从 1 开始的绝对层级
-     */
-    depth: number;
-    /**
-     * 是否有未删除的直接下级，含停用下级
+     * 存在未删除直接下级，含停用节点；索引 EXISTS 查询
      */
     hasChildren: boolean;
     children?: Array<DictResponseDto>;

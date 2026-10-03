@@ -2,6 +2,7 @@
 
 import type { CreateDictDto } from '../models/CreateDictDto.gen';
 import type { DictResponseDto } from '../models/DictResponseDto.gen';
+import type { DictStatusDto } from '../models/DictStatusDto.gen';
 import type { ResOp } from '../models/ResOp.gen';
 import type { UpdateDictDto } from '../models/UpdateDictDto.gen';
 
@@ -9,26 +10,7 @@ export type DictListData = {
     body?: never;
     path?: never;
     query?: {
-        /**
-         * flat 返回按树序排列的全部节点，无 children 字段
-         */
-        format?: 'tree' | 'flat';
-        /**
-         * 指定根节点时是否包含自身；全树查询始终包含根节点
-         */
-        includeSelf?: boolean;
-        /**
-         * 只返回自身及全部祖先均启用的节点；停用分支整体裁剪
-         */
-        enabledOnly?: boolean;
-        /**
-         * 从任意节点查全部层级下级，与 rootCode 互斥
-         */
-        rootId?: string;
-        /**
-         * 用全局唯一编码定位节点，与 rootId 互斥
-         */
-        rootCode?: string;
+        format?: 'flat' | 'tree';
     };
     url: '/system/dict/list';
 };
@@ -41,6 +23,43 @@ export type DictListResponses = {
 
 export type DictListResponse = DictListResponses[keyof DictListResponses];
 
+export type DictRootsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/dict/roots';
+};
+
+export type DictRootsResponses = {
+    200: ResOp & {
+        data: Array<DictResponseDto>;
+    };
+};
+
+export type DictRootsResponse = DictRootsResponses[keyof DictRootsResponses];
+
+export type DictChildrenData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * 仅显示有效分支；普通业务固定为 true
+         */
+        enabledOnly?: boolean;
+    };
+    url: '/system/dict/{id}/children';
+};
+
+export type DictChildrenResponses = {
+    200: ResOp & {
+        data: Array<DictResponseDto>;
+    };
+};
+
+export type DictChildrenResponse = DictChildrenResponses[keyof DictChildrenResponses];
+
 export type DictDescendantsData = {
     body?: never;
     path: {
@@ -48,17 +67,11 @@ export type DictDescendantsData = {
     };
     query?: {
         /**
-         * flat 返回按树序排列的全部节点，无 children 字段
-         */
-        format?: 'tree' | 'flat';
-        /**
-         * 指定根节点时是否包含自身；全树查询始终包含根节点
-         */
-        includeSelf?: boolean;
-        /**
-         * 只返回自身及全部祖先均启用的节点；停用分支整体裁剪
+         * 仅显示有效分支；普通业务固定为 true
          */
         enabledOnly?: boolean;
+        format?: 'flat' | 'tree';
+        includeSelf?: boolean;
     };
     url: '/system/dict/{id}/descendants';
 };
@@ -70,23 +83,6 @@ export type DictDescendantsResponses = {
 };
 
 export type DictDescendantsResponse = DictDescendantsResponses[keyof DictDescendantsResponses];
-
-export type DictRemoveData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/system/dict/{id}';
-};
-
-export type DictRemoveResponses = {
-    200: ResOp & {
-        data: boolean;
-    };
-};
-
-export type DictRemoveResponse = DictRemoveResponses[keyof DictRemoveResponses];
 
 export type DictDetailData = {
     body?: never;
@@ -136,3 +132,20 @@ export type DictCreateResponses = {
 };
 
 export type DictCreateResponse = DictCreateResponses[keyof DictCreateResponses];
+
+export type DictStatusData = {
+    body: DictStatusDto;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/system/dict/{id}/status';
+};
+
+export type DictStatusResponses = {
+    200: ResOp & {
+        data: boolean;
+    };
+};
+
+export type DictStatusResponse = DictStatusResponses[keyof DictStatusResponses];

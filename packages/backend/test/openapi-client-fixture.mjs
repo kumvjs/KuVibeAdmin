@@ -32,7 +32,7 @@ try {
     ? { name: 'KuVibeAdmin', globalPrefix: 'api' }
     : { enable: true, path: 'api-docs', serverUrl: 'http://localhost:7001' } })
   const document = JSON.parse(readFileSync('openapi/openapi.json', 'utf8'))
-  for (const path of ['/system/user/list', '/system/dept/list', '/system/dict/list', '/system/dict/{id}/descendants', '/system/role/list', '/user/info', '/auth/login'])
+  for (const path of ['/system/user/list', '/system/dept/list', '/system/dict/list', '/system/dict/roots', '/dict/{id}/children', '/dict/{id}/descendants', '/system/dict/{id}/descendants', '/system/role/list', '/user/info', '/auth/login'])
     assert.ok(document.paths[path], path)
   console.log(`已从 ${controllers.length} 个真实控制器生成测试契约（非运行实例导出）`)
 }

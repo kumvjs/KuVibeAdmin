@@ -42,8 +42,10 @@ const [Modal, modalApi] = useVbenModal<ModalData>({
     error.value = '';
     try {
       const body = dictWrite(await formApi.getValues());
-      if (current.value) await updateDict(current.value.id, body);
-      else await createDict(body);
+      if (current.value) {
+        const { code: _code, ...update } = body;
+        await updateDict(current.value.id, update);
+      } else await createDict(body);
       modalApi.close();
       emit('success');
     } catch (failure) {
@@ -68,8 +70,20 @@ const [Modal, modalApi] = useVbenModal<ModalData>({
       current.value = node;
       formApi.updateSchema([
         {
+          fieldName: 'code',
+          componentProps: { disabled: !!node },
+        },
+        {
+          fieldName: 'hasValue',
+          componentProps: { disabled: !!node && node.value !== null },
+        },
+        {
+          fieldName: 'value',
+          componentProps: { disabled: !!node && node.value !== null },
+        },
+        {
           fieldName: 'pid',
-          componentProps: { options: parentOptions(rows, node?.id) },
+          componentProps: { treeData: parentOptions(rows, node?.id) },
         },
       ]);
       await formApi.setValues(
@@ -81,7 +95,12 @@ const [Modal, modalApi] = useVbenModal<ModalData>({
               value: node.value ?? '',
               hasValue: node.value !== null,
             }
-          : { pid: data?.pid ?? '0', hasValue: false, status: 1, order: 0 },
+          : {
+              pid: data?.pid ?? '0',
+              hasValue: false,
+              cacheEnabled: false,
+              order: 0,
+            },
       );
       ready.value = true;
     } catch (failure) {
@@ -99,7 +118,7 @@ defineExpose({ modalApi });
   <Modal :title="title">
     <Alert v-if="error" class="mb-4" :message="error" type="error" show-icon />
     <p v-if="current" class="text-muted-foreground mb-4 break-all">
-      {{ current.fullPathName }}
+      {{ current.name }}：编码创建后不可修改；已有业务值请停用后新建替代节点。
     </p>
     <Form class="mx-4" />
   </Modal>

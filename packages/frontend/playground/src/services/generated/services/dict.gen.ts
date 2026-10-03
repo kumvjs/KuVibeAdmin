@@ -3,10 +3,10 @@
 import type { RequestResult } from '../client';
 import { client } from '../client.gen';
 import type { Options } from '../sdk.gen';
-import type { DictCreateData, DictCreateResponses, DictDescendantsData, DictDescendantsResponses, DictDetailData, DictDetailResponses, DictListData, DictListResponses, DictRemoveData, DictRemoveResponses, DictUpdateData, DictUpdateResponses } from '../types/dict.gen';
+import type { DictChildrenData, DictChildrenResponses, DictCreateData, DictCreateResponses, DictDescendantsData, DictDescendantsResponses, DictDetailData, DictDetailResponses, DictListData, DictListResponses, DictRootsData, DictRootsResponses, DictStatusData, DictStatusResponses, DictUpdateData, DictUpdateResponses } from '../types/dict.gen';
 
 /**
- * 获取字典全树或任意节点的全部层级下级
+ * 管理完整字典树/集合；必须具备 system:dict:list，普通业务禁止依赖
  */
 export const dictList = <ThrowOnError extends boolean = true>(options?: Options<DictListData, ThrowOnError>): RequestResult<DictListResponses, unknown, ThrowOnError> => (options?.client ?? client).get<DictListResponses, unknown, ThrowOnError>({
     responseType: 'json',
@@ -16,7 +16,27 @@ export const dictList = <ThrowOnError extends boolean = true>(options?: Options<
 });
 
 /**
- * 获取任意节点的无限层级下级，默认扁平且不含自身
+ * 管理树初始化，只返回根节点
+ */
+export const dictRoots = <ThrowOnError extends boolean = true>(options?: Options<DictRootsData, ThrowOnError>): RequestResult<DictRootsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<DictRootsResponses, unknown, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/system/dict/roots',
+    ...options
+});
+
+/**
+ * 管理按层加载直接下级，不加载子树
+ */
+export const dictChildren = <ThrowOnError extends boolean = true>(options: Options<DictChildrenData, ThrowOnError>): RequestResult<DictChildrenResponses, unknown, ThrowOnError> => (options.client ?? client).get<DictChildrenResponses, unknown, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/system/dict/{id}/children',
+    ...options
+});
+
+/**
+ * 管理指定节点全部下级，默认 flat，不含自身
  */
 export const dictDescendants = <ThrowOnError extends boolean = true>(options: Options<DictDescendantsData, ThrowOnError>): RequestResult<DictDescendantsResponses, unknown, ThrowOnError> => (options.client ?? client).get<DictDescendantsResponses, unknown, ThrowOnError>({
     responseType: 'json',
@@ -26,17 +46,7 @@ export const dictDescendants = <ThrowOnError extends boolean = true>(options: Op
 });
 
 /**
- * 软删除无下级的字典节点，含停用下级时也禁止删除
- */
-export const dictRemove = <ThrowOnError extends boolean = true>(options: Options<DictRemoveData, ThrowOnError>): RequestResult<DictRemoveResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DictRemoveResponses, unknown, ThrowOnError>({
-    responseType: 'json',
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/system/dict/{id}',
-    ...options
-});
-
-/**
- * 获取字典节点及其完整根路径
+ * 管理节点详情，不加载整树或派生路径
  */
 export const dictDetail = <ThrowOnError extends boolean = true>(options: Options<DictDetailData, ThrowOnError>): RequestResult<DictDetailResponses, unknown, ThrowOnError> => (options.client ?? client).get<DictDetailResponses, unknown, ThrowOnError>({
     responseType: 'json',
@@ -46,7 +56,7 @@ export const dictDetail = <ThrowOnError extends boolean = true>(options: Options
 });
 
 /**
- * 局部更新或移动字典节点，后代路径读取时自动更新
+ * 编辑或移动节点，已设置业务值通过停用并新建替换
  */
 export const dictUpdate = <ThrowOnError extends boolean = true>(options: Options<DictUpdateData, ThrowOnError>): RequestResult<DictUpdateResponses, unknown, ThrowOnError> => (options.client ?? client).put<DictUpdateResponses, unknown, ThrowOnError>({
     responseType: 'json',
@@ -60,12 +70,26 @@ export const dictUpdate = <ThrowOnError extends boolean = true>(options: Options
 });
 
 /**
- * 新增字典节点，任意节点可继续新增下级
+ * 新增启用字典节点，编码创建后不可修改
  */
 export const dictCreate = <ThrowOnError extends boolean = true>(options: Options<DictCreateData, ThrowOnError>): RequestResult<DictCreateResponses, unknown, ThrowOnError> => (options.client ?? client).post<DictCreateResponses, unknown, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/system/dict',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * 启用/停用字典，保留历史节点
+ */
+export const dictStatus = <ThrowOnError extends boolean = true>(options: Options<DictStatusData, ThrowOnError>): RequestResult<DictStatusResponses, unknown, ThrowOnError> => (options.client ?? client).put<DictStatusResponses, unknown, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/system/dict/{id}/status',
     ...options,
     headers: {
         'Content-Type': 'application/json',

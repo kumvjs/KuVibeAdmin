@@ -13,6 +13,8 @@ export interface CacheGetOrSetOptions {
   lockTtl?: number // 分布式锁超时（秒），防击穿
   nullTtl?: number // 空值缓存 TTL（秒），防穿透
   allowNull?: boolean // 是否允许缓存 null
+  cacheIf?: (value: unknown) => boolean // 根据回源数据决定是否允许缓存
+  guardFill?: boolean // 失效删除加载锁后，禁止旧加载者回填
   maxRetry?: number // 最大自旋重试次数
 }
 
@@ -23,6 +25,8 @@ const DEFAULT_OPTIONS: Required<CacheGetOrSetOptions> = {
   nullTtl: CAHCE_TTL.SHORT,
   allowNull: true,
   maxRetry: 3,
+  cacheIf: () => true,
+  guardFill: false,
 }
 
 @Injectable()
@@ -30,6 +34,7 @@ export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name)
   private readonly namespace: string = 'default'
   private releaseLockLua: string = ''
+  private unavailableUntil = 0
 
   constructor(
     private readonly redisService: RedisService,
@@ -114,7 +119,18 @@ export class CacheService implements OnModuleInit {
       const jitterTime = Math.floor(Math.random() * opts.jitter)
       const finalTtl = opts.ttl + jitterTime
 
-      await this.setCache(key, value, finalTtl)
+      if (opts.cacheIf(value)) {
+        if (opts.guardFill) {
+          await redis.eval(`
+            if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+            redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[3])
+            return 1
+          `, 2, lockKey, key, lockValue, JSON.stringify({ value }), finalTtl)
+        }
+        else {
+          await this.setCache(key, value, finalTtl)
+        }
+      }
       return value
     }
     catch (err) {
@@ -126,6 +142,45 @@ export class CacheService implements OnModuleInit {
       await redis.eval(this.releaseLockLua, 1, lockKey, lockValue).catch((err) => {
         this.logger.error(`[Cache] 释放分布式锁失败. key=${lockKey}`, err)
       })
+    }
+  }
+
+  /** 可丢失的加速层：短超时/熔断后复用同一 loader 回源，数据库错误继续抛出。 */
+  async getOrLoadBestEffort<T>(key: CacheKey<T>, loader: () => Promise<T>, options?: CacheGetOrSetOptions): Promise<T> {
+    let loading: Promise<T> | undefined
+    const load = () => loading ??= loader()
+    if (Date.now() < this.unavailableUntil)
+      return load()
+    try {
+      return await this.withDeadline(this.getOrSet(key, load, { ...options, guardFill: true })) ?? await load()
+    }
+    catch (error) {
+      this.unavailableUntil = Date.now() + 1000
+      this.logger.warn(`缓存不可用，回源数据库: ${error instanceof Error ? error.message : String(error)}`)
+      return load()
+    }
+  }
+
+  /** 一次 DEL 缓存及对应加载锁；旧 loader 必须持有锁才能回填。 */
+  async invalidateBestEffort(keys: string[]): Promise<void> {
+    try {
+      await this.withDeadline(this.getClient().del(...new Set(keys.flatMap(key => [key, RedisKeys.lock(key)]))))
+    }
+    catch (error) {
+      this.unavailableUntil = Date.now() + 1000
+      this.logger.error('数据库已提交，缓存删除失败；恢复后由短 TTL 回收旧值', error as Error)
+    }
+  }
+
+  private async withDeadline<T>(operation: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([operation, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('缓存操作超过 200ms')), 200)
+      })])
+    }
+    finally {
+      clearTimeout(timer)
     }
   }
 

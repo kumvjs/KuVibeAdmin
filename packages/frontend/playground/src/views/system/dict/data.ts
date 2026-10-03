@@ -4,6 +4,8 @@ import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn } from '#/adapter/vxe-table';
 import type { DictNode } from '#/api/system/dict';
 
+import { getPopupContainer } from '@vben/utils';
+
 import { z } from '#/adapter/form';
 
 export function useSchema(): VbenFormSchema[] {
@@ -36,15 +38,18 @@ export function useSchema(): VbenFormSchema[] {
         ),
     },
     {
-      component: 'Select',
+      component: 'TreeSelect',
       fieldName: 'pid',
       label: '上级节点',
       defaultValue: '0',
       componentProps: {
         class: 'w-full',
         showSearch: true,
-        optionFilterProp: 'label',
-        options: [],
+        placeholder: '搜索名称或编码，选择上级节点',
+        fieldNames: { label: 'label', value: 'value', children: 'children' },
+        getPopupContainer,
+        treeNodeFilterProp: 'label',
+        treeData: [],
       },
       rules: 'required',
     },
@@ -83,18 +88,10 @@ export function useSchema(): VbenFormSchema[] {
       rules: z.number().int().min(0).max(2_147_483_647),
     },
     {
-      component: 'RadioGroup',
-      fieldName: 'status',
-      label: '状态',
-      defaultValue: 1,
-      componentProps: {
-        optionType: 'button',
-        buttonStyle: 'solid',
-        options: [
-          { label: '启用', value: 1 },
-          { label: '停用', value: 0 },
-        ],
-      },
+      component: 'Switch',
+      fieldName: 'cacheEnabled',
+      label: '允许业务查询缓存',
+      defaultValue: false,
     },
     {
       component: 'Textarea',
@@ -113,7 +110,7 @@ export function useColumns(
     {
       field: 'name',
       title: '节点名称',
-      treeNode: true,
+      slots: { default: 'name' },
       fixed: 'left',
       minWidth: 240,
     },
@@ -144,18 +141,6 @@ export function useColumns(
     },
     { field: 'order', title: '排序', width: 80 },
     {
-      field: 'fullPathName',
-      title: '完整名称路径',
-      minWidth: 260,
-      showOverflow: true,
-    },
-    {
-      field: 'fullPathId',
-      title: '完整 ID 路径',
-      minWidth: 180,
-      showOverflow: true,
-    },
-    {
       field: 'operation',
       title: '操作',
       fixed: 'right',
@@ -169,13 +154,12 @@ export function useColumns(
           onClick: onActionClick,
         },
         options: [
-          { code: 'subtree', text: '查看下级', auth: ['system:dict:list'] },
           { code: 'append', text: '新增下级', auth: ['system:dict:create'] },
           { code: 'edit', auth: ['system:dict:update'] },
           {
-            code: 'delete',
-            auth: ['system:dict:delete'],
-            disabled: (row: DictNode) => row.hasChildren,
+            code: 'status',
+            text: (row: DictNode) => (row.status === 1 ? '停用' : '启用'),
+            auth: ['system:dict:disable'],
           },
         ],
       },

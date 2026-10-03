@@ -15,6 +15,7 @@ import { TrustedOriginGuard } from './modules/auth/guards/trusted-origin.guard.j
 import { BillingModule } from './modules/billing/billing.module.js'
 import { isPlaygroundEnabled } from './modules/playground/playground.constants.js'
 import { PlaygroundModule } from './modules/playground/playground.module.js'
+import { DictBusinessModule } from './modules/system/dict/dict-business.module.js'
 import { SystemModule } from './modules/system/system.module.js'
 import { TasksModule } from './modules/tasks/tasks.module.js'
 import { TimezoneModule } from './modules/timezone/timezone.module.js'
@@ -44,6 +45,7 @@ import { SharedModule } from './shared/shared.module.js'
     TimezoneModule,
     AiModule,
     SystemModule,
+    DictBusinessModule,
     UploadModule,
     TasksModule,
     ...(isPlaygroundEnabled() ? [PlaygroundModule] : []),

@@ -44,8 +44,8 @@ export const INITIAL_MENUS: SeedMenu[] = [
     ...([
       ['Create', '新增', page.permissions.CREATE],
       ['Edit', '编辑', page.permissions.UPDATE],
-      ['Delete', '删除', page.permissions.DELETE],
-    ] as const).map(([suffix, title, authCode]): SeedMenu => ({ name: `${page.name}${suffix}`, parent: page.name, authCode, type: MenuType.BUTTON, meta: { title } })),
+      ...('DELETE' in page.permissions ? [['Delete', '删除', page.permissions.DELETE] as const] : [['Disable', '启停', page.permissions.DISABLE] as const]),
+    ] as ReadonlyArray<readonly [string, string, string]>).map(([suffix, title, authCode]): SeedMenu => ({ name: `${page.name}${suffix}`, parent: page.name, authCode, type: MenuType.BUTTON, meta: { title } })),
   ]),
   { name: 'SystemAttachment', parent: 'System', path: '/system/attachment', type: MenuType.CATALOG, meta: { title: '附件管理', icon: 'lucide:paperclip', order: 4 } },
   ...([

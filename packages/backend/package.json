@@ -1,7 +1,7 @@
 {
   "name": "@kumvjs/kuvibe-admin-backend",
   "type": "module",
-  "version": "1.4.0",
+  "version": "2.0.1",
   "private": true,
   "description": "KuVibeAdmin NestJS 后端",
   "author": "",
@@ -40,7 +40,8 @@
     "test:tasks:integration": "pnpm build && node test/tasks.integration.mjs",
     "test:rabbitmq:integration": "pnpm build && node test/rabbitmq.backpressure.integration.mjs",
     "lint:check": "eslint \"{src,test}/**/*.{ts,mjs}\"",
-    "test:setup:integration": "pnpm build && node --test test/setup-data.integration.mjs"
+    "test:setup:integration": "pnpm build && node --test test/setup-data.integration.mjs",
+    "test:dict:integration": "cross-env TYPEORM_TYPE=postgres node --test test/dict.integration.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "3.1.0",

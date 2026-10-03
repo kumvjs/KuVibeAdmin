@@ -34,6 +34,9 @@ export class SysDictEntity extends CommonEntity {
   @Column({ name: 'order_no', type: 'integer', default: 0 })
   order: number
 
+  @Column({ name: 'cache_enabled', type: 'boolean', default: false })
+  cacheEnabled: boolean
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   remark: string | null
 }

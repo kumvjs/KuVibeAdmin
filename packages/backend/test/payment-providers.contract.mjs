@@ -83,7 +83,7 @@ test('Google productsv2按token去重、待付款不假造完成时间、检测�
   assert.equal((await provider.query('test.app', 'sandbox', 'purchasefixture')).payment.refundScope, 'partial')
   data.testPurchaseContext = undefined
   await assert.rejects(provider.query('test.app', 'sandbox', 'purchasefixture'), /环境/)
-  provider.request = async () => ({ purchaseStateContext: { purchaseState: 'PENDING' } })
+  provider.request = async () => ({ purchaseStateContext: { purchaseState: 'PENDING' }, testPurchaseContext: { fopType: 'TEST' } })
   const pending = await provider.query('test.app', 'sandbox', 'purchasefixture')
   assert.equal(pending.payment.state, 'pending')
   assert.equal(pending.payment.paidAt, null)
@@ -93,6 +93,28 @@ test('Google productsv2按token去重、待付款不假造完成时间、检测�
 function createHashForToken(token) {
   return createHash('sha256').update(token).digest('hex')
 }
+
+test('Google实付查Orders Money；金额服务失败或交易/SKU不符不能使用站内或SDK展示价格', async () => {
+  const provider = new GoogleProvider({ ...config, settings: { google: [{ enabled: true, packageName: 'test.app', environment: 'sandbox' }] } })
+  const purchase = { orderId: 'GPA.1234-5678-9012', purchaseStateContext: { purchaseState: 'PURCHASED' }, testPurchaseContext: {}, productLineItem: [{ productId: 'sku', productOfferDetails: { quantity: 1, refundableQuantity: 1 } }], purchaseCompletionTime: '2026-10-03T02:00:00Z' }
+  const order = { orderId: purchase.orderId, purchaseToken: 'moneyfixture', lineItems: [{ productId: 'sku' }], total: { currencyCode: 'CNY', units: '9', nanos: 900000000 } }
+  provider.request = async (_settings, _method, path) => path.includes('/orders/') ? order : purchase
+  assert.deepEqual((await provider.query('test.app', 'sandbox', 'moneyfixture')).payment.platformAmount, { value: '9900000000', scale: 9, currency: 'CNY', source: 'google_order' })
+  order.purchaseToken = 'wrong'
+  assert.equal((await provider.query('test.app', 'sandbox', 'moneyfixture')).payment.platformAmount, undefined)
+  order.purchaseToken = 'moneyfixture'
+  order.lineItems[0].productId = 'wrong'
+  assert.equal((await provider.query('test.app', 'sandbox', 'moneyfixture')).payment.platformAmount, undefined)
+  provider.request = async (_settings, _method, path) => {
+    if (path.includes('/orders/'))
+      throw new Error('amount_unavailable')
+    return purchase
+  }
+  const verified = (await provider.query('test.app', 'sandbox', 'moneyfixture')).payment
+  assert.equal(verified.state, 'paid')
+  assert.equal(verified.platformAmount, undefined)
+  assert.equal(verified.amountMinor, null)
+})
 
 test('退款契约：微信签名查询状态和金额、加密退款通知；支付宝成功码不能替代退款成功状态', async () => {
   const wechat = new WechatProvider(config)

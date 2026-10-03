@@ -62,6 +62,18 @@ export class CatalogService {
     return { items: rows.map(row => this.packageResult(row, (row as RechargePackageEntity & { current: PackageVersionEntity }).current)), total }
   }
 
+  async packageDetail(packageId: string) {
+    positiveInteger(packageId, 'packageId')
+    const stable = await this.source.getRepository(RechargePackageEntity).findOneBy({ id: packageId, tenantId: '1' })
+    if (!stable)
+      throw new NotFoundException('套餐不存在')
+    const version = await this.source.getRepository(PackageVersionEntity).findOneBy({ packageId, revision: stable.currentRevision, tenantId: '1' })
+    if (!version)
+      throw new NotFoundException('套餐版本不存在')
+    const products = await this.source.getRepository(ChannelProductEntity).find({ where: { versionId: version.id, tenantId: '1' }, order: { id: 'ASC' } })
+    return { ...this.packageResult(stable, version), products: products.map(product => this.productResult(product)) }
+  }
+
   async createPromotion(dto: PromotionCreateDto, actorId: string) {
     return billingTransaction(this.source, async (manager) => {
       const fields = this.promotionFields(dto)
@@ -123,6 +135,11 @@ export class CatalogService {
       const version = await manager.getRepository(PackageVersionEntity).findOneBy({ id: dto.versionId, tenantId: '1' })
       if (!version)
         throw new NotFoundException('套餐版本不存在')
+      // SKU只标识基础商品；多个活动上下文可引用，但不能改变其基础权益。
+      await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`sku:${dto.channel}:${dto.applicationId}:${dto.environment}:${dto.productId}`])
+      const references = await manager.getRepository(ChannelProductEntity).find({ where: { channel: dto.channel, applicationId: dto.applicationId, environment: dto.environment, productId: dto.productId, tenantId: '1' }, relations: { version: true } })
+      if (references.some(row => row.version.priceMinor !== version.priceMinor || row.version.basePoints !== version.basePoints))
+        throw new UnprocessableEntityException('共享内购商品须保持相同标价和基础积分；不同基础权益请使用新的商品ID')
       const product = await manager.getRepository(ChannelProductEntity).save({ versionId: dto.versionId, channel: dto.channel, applicationId: dto.applicationId, environment: dto.environment, productId: dto.productId, actorId })
       return this.productResult(product)
     })

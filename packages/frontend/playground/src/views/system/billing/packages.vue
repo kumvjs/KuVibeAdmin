@@ -7,15 +7,15 @@ import { computed, onMounted, ref } from 'vue';
 import { Button, Modal } from 'antdv-next';
 
 import {
+  getPackageDetail,
   getPackages,
-  getProducts,
   publishPackage,
   savePackage,
   saveProduct,
 } from '#/api/billing';
 import { packageFields, productFields } from '#/views/billing/fields';
 import FormEditor from '#/views/billing/form-editor.vue';
-import { can, channels, money, points, useTask } from '#/views/billing/helpers';
+import { can, money, points, useTask } from '#/views/billing/helpers';
 
 const rows = ref<RechargePackage[]>([]);
 const page = ref(1);
@@ -25,6 +25,7 @@ const editor = ref(false);
 const productEditor = ref(false);
 const productOpen = ref(false);
 const products = ref<ChannelProduct[]>([]);
+const productChannel = ref<'apple' | 'google'>('apple');
 const { busy, error, run } = useTask();
 const fields = computed<Field[]>(() =>
   selected.value
@@ -65,10 +66,19 @@ async function publish(row: RechargePackage) {
 }
 async function showProducts(row: RechargePackage) {
   await run(async () => {
-    selected.value = row;
-    products.value = await getProducts(row.versionId);
+    const current = await getPackageDetail(row.id);
+    selected.value = current;
+    products.value = current.products;
     productOpen.value = true;
   });
+}
+async function commitProduct(body: Body) {
+  if (!selected.value) throw new Error('请先选择充值套餐');
+  return saveProduct({ ...body, versionId: selected.value.versionId });
+}
+function addProduct(channel: 'apple' | 'google') {
+  productChannel.value = channel;
+  productEditor.value = true;
 }
 onMounted(() => load());
 </script>
@@ -158,7 +168,7 @@ onMounted(() => load());
                   :disabled="busy"
                   @click="showProducts(row)"
                 >
-                  内购商品
+                  iOS / Google Play
                 </Button>
               </div>
             </td>
@@ -185,12 +195,12 @@ onMounted(() => load());
     />
     <Modal
       v-model:open="productOpen"
-      title="当前版本内购商品"
+      :title="`${selected?.title ?? ''} · iOS / Google Play 商品`"
       :width="760"
       :footer="null"
     >
       <p class="billing-muted">
-        固定SKU绑定套餐版本，不能覆盖旧SKU权益。价格由商店展示；严格站内库存和现金券不用于内购。
+        当前套餐版本 v{{ selected?.revision }}。维护 iOS 内购或 Google Play 的商品 ID、应用 ID 和环境。同价同基础积分的套餐可共享商品，赠送按各自订单；旧关联不可修改，扣款价格由商店展示。
       </p>
       <div class="billing-table">
         <table>
@@ -204,7 +214,7 @@ onMounted(() => load());
           </thead>
           <tbody>
             <tr v-for="product in products" :key="product.id">
-              <td>{{ channels[product.channel] }}</td>
+              <td>{{ product.channel === 'apple' ? 'iOS 内购（App Store）' : 'Google Play' }}</td>
               <td>{{ product.applicationId }}</td>
               <td>{{ product.environment }}</td>
               <td>{{ product.productId }}</td>
@@ -213,20 +223,21 @@ onMounted(() => load());
         </table>
         <p v-if="!products.length" class="billing-empty">暂无映射</p>
       </div>
-      <Button
+      <div
         v-if="can('system:billing:catalog:write')"
-        type="primary"
-        @click="productEditor = true"
+        class="billing-actions"
       >
-        添加商品映射
-      </Button>
+        <Button type="primary" @click="addProduct('apple')">添加 iOS 内购商品</Button>
+        <Button @click="addProduct('google')">添加 Google Play 商品</Button>
+      </div>
     </Modal>
     <FormEditor
       v-model:open="productEditor"
-      title="添加固定SKU映射"
+      :title="`添加${productChannel === 'apple' ? ' iOS 内购' : ' Google Play'}商品 · ${selected?.title ?? ''}`"
       :fields="productFields"
-      :initial="{ versionId: selected?.versionId }"
-      :commit="saveProduct"
+      :initial="{ channel: productChannel }"
+      :commit="commitProduct"
+      notice="自动绑定当前套餐版本；应用 ID 填写 iOS Bundle ID 或 Android Package Name，商品 ID 须与对应商店后台一致。同一应用及环境下的已有商品 ID 不能改绑套餐。"
       @saved="selected && showProducts(selected)"
     />
   </div>

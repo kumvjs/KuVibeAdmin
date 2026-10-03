@@ -5,7 +5,7 @@ import { Injectable, ServiceUnavailableException, UnauthorizedException } from '
 import { GoogleAuth, OAuth2Client } from 'google-auth-library'
 import { parseInstant } from '#/utils/time.util.js'
 import { PaymentConfigService } from './payment-config.service.js'
-import { channelDeadline, safeChannelInteger } from './payment.types.js'
+import { channelDeadline, googleOrderAmount, safeChannelInteger } from './payment.types.js'
 
 export interface GooglePurchase { payment: ProviderPayment, consumed: boolean }
 
@@ -26,6 +26,8 @@ export class GoogleProvider {
     const states: Record<string, ProviderPayment['state']> = { PURCHASED: 'paid', PENDING: 'pending', CANCELLED: 'closed' }
     const line = data.productLineItem?.[0]
     if (state === 'PENDING') {
+      if ((data.testPurchaseContext ? 'sandbox' : 'production') !== environment)
+        throw new UnauthorizedException('Google待付款测试环境不符')
       // 待付款应答可能尚未包含购买完成信息；仅继续等待，不确认商品权益或消费。
       return { payment: { channel: 'google', transactionKey: createHash('sha256').update(token).digest('hex'), merchantNo: null, applicationId, merchantId: applicationId, environment: environment as PaymentBinding['environment'], state: 'pending', amountMinor: null, currency: null, productId: line?.productId ?? null, bindingToken: data.obfuscatedExternalProfileId ?? null, storeAccountId: data.obfuscatedExternalAccountId ?? null, quantity: '1', paidAt: null, evidenceHash: createHash('sha256').update(JSON.stringify(data)).digest('hex') }, consumed: false }
     }
@@ -38,6 +40,17 @@ export class GoogleProvider {
     const fullRefund = state === 'PURCHASED' && refundable === '0'
     const partial = state === 'PURCHASED' && BigInt(refundable) < BigInt(quantity) && !fullRefund
     const payment: ProviderPayment = { channel: 'google', transactionKey: createHash('sha256').update(token).digest('hex'), merchantNo: null, applicationId, merchantId: applicationId, environment: environment as PaymentBinding['environment'], state: fullRefund || partial ? 'refunded' : states[state], amountMinor: null, currency: null, productId: line.productId, bindingToken: data.obfuscatedExternalProfileId ?? null, storeAccountId: data.obfuscatedExternalAccountId ?? null, quantity, paidAt: state === 'PURCHASED' ? parseInstant(data.purchaseCompletionTime) : null, evidenceHash: createHash('sha256').update(JSON.stringify(data)).digest('hex'), ...(fullRefund || partial ? { refundScope: partial ? 'partial' : 'full' } : {}) }
+    if (typeof data.orderId === 'string' && /^[\w.-]{1,255}$/.test(data.orderId)) {
+      payment.platformOrderId = data.orderId
+      try {
+        const order = await this.request(settings, 'GET', `/applications/${encodeURIComponent(applicationId)}/orders/${encodeURIComponent(data.orderId)}`)
+        if (order.orderId === data.orderId && order.purchaseToken === token && Array.isArray(order.lineItems) && order.lineItems.length === 1 && order.lineItems[0]?.productId === payment.productId && order.total) {
+          payment.platformAmount = googleOrderAmount(order.total)
+          payment.currency = payment.platformAmount.currency
+        }
+      }
+      catch { /* 金额查验失败不丢已验真的购买；独立持久任务补查，不伪造实付。 */ }
+    }
     return { payment, consumed: line.productOfferDetails.consumptionState === 'CONSUMPTION_STATE_CONSUMED' }
   }
 

@@ -23,6 +23,7 @@ import { billingTransaction } from '../shared/billing-transaction.js'
 import { PaymentAttemptEntity } from './entities/payment-attempt.entity.js'
 import { PaymentInboxEntity } from './entities/payment-inbox.entity.js'
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity.js'
+import { recordPayment } from './payment-transactions.js'
 
 /** 仅接受适配器验真后的事实，不提供可直接指定paid的HTTP接口。 */
 @Injectable()
@@ -36,11 +37,28 @@ export class SettlementService {
       const state = await this.orders.lockUserState(manager, hint.userId)
       const order = await this.orders.lockOrder(manager, id, hint.userId)
       const attempt = await manager.getRepository(PaymentAttemptEntity).findOneBy({ orderId: id })
-      if (!attempt || !this.matches(order, attempt, payment)) {
-        await this.review(manager, order, inboxId, 'payment_binding_mismatch')
+      const transaction = await recordPayment(manager, payment, inboxId)
+      payment = transaction.latestFacts ?? transaction.facts
+      const transactions = manager.getRepository(PaymentTransactionEntity)
+      const markReview = async (reason: string) => {
+        if (transaction.status !== 'fulfilled')
+          await transactions.update(transaction.id, { status: 'review', reason })
+        await this.review(manager, order, inboxId, reason)
         return { status: 'review' }
       }
+      if (!attempt || !this.matches(order, attempt, payment, transaction.manualBinding)) {
+        return markReview('payment_binding_mismatch')
+      }
+      if (transaction.orderId !== null && transaction.orderId !== id)
+        return markReview('transaction_already_bound')
+      const existing = await transactions.findOneBy({ orderId: id })
+      if (existing && existing.transactionKey !== payment.transactionKey)
+        return markReview('multiple_transactions_for_order')
+      if (!transaction.orderId)
+        await transactions.update(transaction.id, { orderId: id, status: 'matched', reason: null })
       if (payment.state !== 'paid') {
+        if (payment.state === 'pending')
+          return { status: 'pending' }
         if (payment.state === 'refunded') {
           if (this.refunds)
             return this.refunds.recover(manager, order, payment, inboxId)
@@ -52,33 +70,26 @@ export class SettlementService {
           return { status: 'review' }
         }
         if (payment.state === 'closed' && ['apple', 'google'].includes(order.channel) && order.status === 'pending') {
+          await this.orders.releaseReservations(manager, id)
           await manager.getRepository(RechargeOrderEntity).update(id, { status: 'closed', closedAt: () => 'NOW()' })
           await this.orders.event(manager, id, 'store_cancelled', null, '已验真商店取消，未发放权益或占用首单资格')
         }
         await this.done(manager, inboxId)
         return { status: payment.state }
       }
-      // 用户锁保证同一用户首单互斥；交易锁保证跨用户重复凭据也不重复履约。
-      await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`${payment.channel}:${payment.transactionKey}`])
-      const transactions = manager.getRepository(PaymentTransactionEntity)
-      const duplicate = await transactions.findOneBy({ channel: payment.channel, transactionKey: payment.transactionKey })
-      if (duplicate && duplicate.orderId !== id) {
-        await this.review(manager, order, inboxId, 'transaction_already_bound')
-        return { status: 'review' }
-      }
-      const existing = await transactions.findOneBy({ orderId: id })
-      if (existing && existing.transactionKey !== payment.transactionKey) {
-        await this.review(manager, order, inboxId, 'multiple_transactions_for_order')
-        return { status: 'review' }
-      }
-      if (existing || order.paidLedgerId) {
+      // 用户锁串行化资格，交易锁由recordPayment持有；只有实际入账才算履约终态。
+      if (order.paidLedgerId) {
         await this.done(manager, inboxId)
         return { status: order.status }
       }
+      const [{ expired }] = await manager.query('SELECT $1::timestamptz <= clock_timestamp() AS expired', [order.expiresAt])
+      if (['apple', 'google'].includes(order.channel) && expired && ['pending', 'closing'].includes(order.status)) {
+        await this.orders.releaseReservations(manager, id)
+        await manager.getRepository(RechargeOrderEntity).update(id, { status: 'closed', closedAt: () => 'clock_timestamp()' })
+        return markReview('late_payment_after_local_close')
+      }
       if (!['pending', 'closing'].includes(order.status)) {
-        await transactions.insert({ orderId: id, channel: payment.channel, transactionKey: payment.transactionKey, facts: payment, inboxId, bonusPoints: '0' })
-        await this.review(manager, order, inboxId, 'late_payment_after_local_close')
-        return { status: 'review' }
+        return markReview('late_payment_after_local_close')
       }
       const [{ now }] = await manager.query('SELECT clock_timestamp() AS now')
       const date = getBusinessDate('Asia/Shanghai', now)
@@ -95,7 +106,7 @@ export class SettlementService {
       const paid = await grant(order.snapshot.basePoints, 'paid')
       const giftAmount = (BigInt(order.snapshot.giftPoints) + BigInt(bonusPoints)).toString()
       const gift = giftAmount === '0' ? null : await grant(giftAmount, 'gift')
-      await transactions.insert({ orderId: id, channel: payment.channel, transactionKey: payment.transactionKey, facts: payment, inboxId, bonusPoints })
+      await transactions.update(transaction.id, { status: 'fulfilled', reason: null, bonusPoints })
       await manager.getRepository(RechargeOrderEntity).update(id, { status: 'paid', settledAt: now, paidLedgerId: paid.id, giftLedgerId: gift?.id ?? null })
       await saveRechargeStreak(manager, order.userId, order.packageId, streak)
       await manager.getRepository(RechargeUserStateEntity).update(state.id, { settlementSequence: (BigInt(state.settlementSequence) + 1n).toString(), firstOrderId: state.firstOrderId ?? id, ...(state.currentOrderId === id ? { currentOrderId: null } : {}) })
@@ -109,13 +120,23 @@ export class SettlementService {
     })
   }
 
-  private matches(order: RechargeOrderEntity, attempt: PaymentAttemptEntity, payment: ProviderPayment) {
+  private matches(order: RechargeOrderEntity, attempt: PaymentAttemptEntity, payment: ProviderPayment, manual: PaymentTransactionEntity['manualBinding']) {
     const binding = attempt.binding
     if (order.channel !== payment.channel || payment.applicationId !== binding.applicationId || payment.merchantId !== binding.merchantId || payment.environment !== binding.environment || payment.quantity !== '1' || !payment.transactionKey || payment.transactionKey.length > 255)
       return false
     if (['wechat', 'alipay'].includes(order.channel))
       return payment.merchantNo === order.merchantNo && (payment.state !== 'paid' || (payment.amountMinor === order.payableMinor && payment.currency === 'CNY'))
-    return payment.productId === order.snapshot.productId && payment.bindingToken === attempt.storeToken && (order.channel !== 'google' || payment.storeAccountId === binding.storeAccountId)
+    const approved = manual?.orderId === order.id
+    if (order.channel === 'google' && binding.googleOrderMode === 'account') {
+      // Google没有商户订单号；账号归属+客户端原订单上下文+一次性token关联。
+      const paidAt = payment.paidAt === null ? null : new Date(payment.paidAt).getTime()
+      return payment.productId === order.snapshot.productId
+        && (payment.storeAccountId === binding.storeAccountId || (approved && !payment.storeAccountId))
+        && (approved || payment.state !== 'paid' || (paidAt !== null && paidAt >= attempt.createdAt.getTime()))
+    }
+    return payment.productId === order.snapshot.productId
+      && (payment.bindingToken === attempt.storeToken || (approved && payment.bindingToken === null))
+      && (order.channel !== 'google' || payment.storeAccountId === binding.storeAccountId || (approved && !payment.storeAccountId))
   }
 
   private async bonus(manager: EntityManager, order: RechargeOrderEntity, date: string, now: Date, firstUser: boolean, firstDay: boolean, streak: ConsecutiveQuoteContext) {

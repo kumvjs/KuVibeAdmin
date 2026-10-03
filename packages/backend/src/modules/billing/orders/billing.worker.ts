@@ -13,7 +13,7 @@ import { BillingOutboxService } from './outbox.service.js'
 export class BillingWorker implements OnModuleInit {
   private readonly logger = new Logger(BillingWorker.name)
   private active = false
-  private readonly types = ['order_expire', 'payment_prepare', 'payment_poll', 'payment_inbox', 'order_close', 'google_consume', 'refund_execute', 'reconcile']
+  private readonly types = ['order_expire', 'payment_prepare', 'payment_poll', 'payment_inbox', 'payment_recover', 'payment_recheck', 'payment_amount', 'order_close', 'google_consume', 'refund_execute', 'reconcile']
 
   constructor(private readonly outbox: BillingOutboxService, private readonly orders: OrdersService, private readonly payments: PaymentsService, private readonly refunds?: RefundsService, private readonly reconcile?: ReconciliationService, @Optional() private readonly rabbit?: RabbitMqService) {}
 
@@ -71,6 +71,12 @@ export class BillingWorker implements OnModuleInit {
       }
       else if (lease.type === 'google_consume') {
         await this.payments.consume(lease.aggregateId)
+      }
+      else if (lease.type === 'payment_recover' || lease.type === 'payment_recheck') {
+        await this.payments.recoverTransaction(lease.aggregateId, lease.type === 'payment_recover')
+      }
+      else if (lease.type === 'payment_amount') {
+        await this.payments.recoverAmount(lease.aggregateId)
       }
       else if (lease.type === 'refund_execute') {
         if (!this.refunds)

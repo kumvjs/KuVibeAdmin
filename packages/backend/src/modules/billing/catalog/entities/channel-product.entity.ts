@@ -5,7 +5,7 @@ import { BillingRecord } from '../../shared/billing-record.js'
 import { PackageVersionEntity } from './recharge-package.entity.js'
 
 @Entity('biz_channel_product')
-@Index('uq_channel_product', ['channel', 'applicationId', 'environment', 'productId'], { unique: true })
+@Index('uq_channel_product', ['versionId', 'channel', 'applicationId', 'environment', 'productId'], { unique: true })
 @Check('chk_channel_product_kind', '"channel" IN (\'apple\', \'google\') AND "environment" IN (\'sandbox\', \'production\')')
 export class ChannelProductEntity extends BillingRecord {
   @Column({ name: 'version_id', type: 'bigint' })

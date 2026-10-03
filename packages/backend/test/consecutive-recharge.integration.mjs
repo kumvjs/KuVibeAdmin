@@ -144,8 +144,8 @@ test('事务失败不推进连续事实或发分；相同凭据重试只发一�
   await promotion(pkg, { pointsBudget: '10' })
   const first = await prepare(buyer, pkg)
   businessTime = dates[0]
-  await source.query(`CREATE FUNCTION streak_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.order_id=${first.row.id} THEN RAISE EXCEPTION 'streak_fixture_failure'; END IF; RETURN NEW; END; $$`)
-  await source.query('CREATE TRIGGER streak_fixture_failure BEFORE INSERT ON biz_payment_transaction FOR EACH ROW EXECUTE FUNCTION streak_fixture_failure()')
+  await source.query(`CREATE FUNCTION streak_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.order_id=${first.row.id} AND NEW.status='fulfilled' THEN RAISE EXCEPTION 'streak_fixture_failure'; END IF; RETURN NEW; END; $$`)
+  await source.query('CREATE TRIGGER streak_fixture_failure BEFORE UPDATE ON biz_payment_transaction FOR EACH ROW EXECUTE FUNCTION streak_fixture_failure()')
   try {
     await assert.rejects(settlement.settle(first.row.id, first.payment), /streak_fixture_failure/)
   }

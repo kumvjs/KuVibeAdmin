@@ -6,7 +6,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import { Button, message } from 'antdv-next';
 
-import { getPromotions, issueCoupon, publishPromotion, savePromotion } from '#/api/billing';
+import { getPackages, getPromotions, issueCoupon, publishPromotion, savePromotion } from '#/api/billing';
 import { promotionFields } from '#/views/billing/fields';
 import FormEditor from '#/views/billing/form-editor.vue';
 import { can, points, time, useTask } from '#/views/billing/helpers';
@@ -17,6 +17,8 @@ const total = ref(0);
 const selected = ref<Promotion>();
 const editor = ref(false);
 const coupon = ref(false);
+const packageOptions = ref<{ label: string; value: string }[]>([]);
+const { busy: packageLoading, error: packageError, run: runPackages } = useTask();
 const { busy, error, run } = useTask();
 const effects: Record<string, string> = {
   bonus_bps: '比例赠分',
@@ -30,9 +32,17 @@ const eligibility: Record<string, string> = {
   first_day: '每日首单',
   first_user: '用户首单',
 };
-const fields = computed<Field[]>(() =>
-  selected.value
-    ? promotionFields
+const fields = computed<Field[]>(() => {
+  const options = [...packageOptions.value];
+  for (const id of selected.value?.packageIds ?? []) {
+    if (!options.some((option) => option.value === id))
+      options.push({ value: id, label: `套餐 #${id}（当前不可用）` });
+  }
+  const configured = promotionFields.map((field) =>
+    field.key === 'packageIds' ? { ...field, options } : field,
+  );
+  return selected.value
+    ? configured
     : [
         {
           key: 'code',
@@ -40,9 +50,9 @@ const fields = computed<Field[]>(() =>
           required: true,
           hint: '小写字母开头，最长50字符',
         },
-        ...promotionFields,
-      ],
-);
+        ...configured,
+      ];
+});
 const couponFields: Field[] = [
   {
     key: 'promotionId',
@@ -81,14 +91,27 @@ async function load(number = page.value) {
     page.value = number;
   });
 }
-function edit(row?: Promotion) {
-  selected.value = row;
-  editor.value = true;
+async function edit(row?: Promotion) {
+  await runPackages(async () => {
+    const options = new Map<string, { label: string; value: string }>();
+    let number = 1;
+    let result;
+    do {
+      result = await getPackages({ page: number++, limit: 100 }, true);
+      for (const item of result.items) {
+        const status = item.status === 'enabled' ? '已上架' : item.status === 'draft' ? '草稿' : '已下架';
+        options.set(item.id, { value: item.id, label: `${item.title} · ${item.code} · #${item.id}（${status}）` });
+      }
+    } while (result.items.length && (number - 1) * 100 < result.total);
+    packageOptions.value = [...options.values()];
+    selected.value = row;
+    editor.value = true;
+  });
 }
 async function commit(body: Body) {
   if (body.effect === 'bonus_consecutive') {
     if (!Array.isArray(body.packageIds) || !body.packageIds.length)
-      throw new Error('连续充值赠送须填写适用套餐ID，各套餐独立统计连续天数');
+      throw new Error('连续充值赠送须选择适用套餐，各套餐独立统计连续天数');
     if (
       !Array.isArray(body.dailyBonusPoints) ||
       body.dailyBonusPoints.length !== body.maxConsecutiveDays
@@ -127,6 +150,7 @@ onMounted(() => load());
         <Button :loading="busy" @click="load()">刷新</Button><Button
           v-if="can('system:billing:promotion:write')"
           type="primary"
+          :loading="packageLoading"
           @click="edit()"
         >
           新增活动
@@ -134,6 +158,7 @@ onMounted(() => load());
       </div>
     </header>
     <p v-if="error" class="billing-error" role="alert">{{ error }}</p>
+    <p v-if="packageError" class="billing-error" role="alert">套餐加载失败：{{ packageError }}。请重新点击新增活动或新版本重试。</p>
     <section class="billing-panel billing-table">
       <table>
         <thead>
@@ -159,14 +184,10 @@ onMounted(() => load());
                     ?.map((value, index) => `第${index + 1}天 ${points(value)}积分`)
                     .join('；')
                 }}<br />
-                <span class="billing-muted"
-                  >{{ row.consecutiveGrantMode === 'every_order' ? '每单赠送' : '每天首笔赠送' }} ·
-                  超出按最后一天赠送 · 实付不减免</span
-                >
+                <span class="billing-muted">{{ row.consecutiveGrantMode === 'every_order' ? '每单赠送' : '每天首笔赠送' }} ·
+                  超出按最后一天赠送 · 实付不减免</span>
               </template>
-              <template v-else>{{ effects[row.effect] }} {{ row.value }}</template
-              ><br /><span class="billing-muted"
-                >{{ eligibility[row.eligibility]
+              <template v-else>{{ effects[row.effect] }} {{ row.value }}</template><br /><span class="billing-muted">{{ eligibility[row.eligibility]
                 }}{{ row.requiresCoupon ? ' · 需要券码' : '' }}</span>
             </td>
             <td>{{ time(row.startsAt) }}<br />{{ time(row.endsAt) }}</td>
@@ -187,6 +208,7 @@ onMounted(() => load());
                 <Button
                   v-if="can('system:billing:promotion:write')"
                   size="small"
+                  :disabled="packageLoading"
                   @click="edit(row)"
                 >
                   新版本

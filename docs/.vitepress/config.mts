@@ -44,6 +44,7 @@ export default defineConfig({
           { text: '系统字典', link: '/modules/dictionary' },
           { text: '用户积分', link: '/modules/points' },
           { text: '充值套餐与优惠', link: '/modules/recharge' },
+          { text: '充值下单与支付接入', link: '/modules/recharge-payment-flow' },
           { text: '任务调度与 RabbitMQ', link: '/modules/task-scheduling' },
           { text: 'WebSocket', link: '/modules/websocket' },
           { text: 'AI Agents', link: '/modules/ai-agents' },

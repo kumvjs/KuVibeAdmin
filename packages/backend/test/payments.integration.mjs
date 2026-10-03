@@ -4,6 +4,7 @@ import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { after, before, test } from 'node:test'
 import { DataSource } from 'typeorm'
 import { AddPaymentProcessing1790753142319 } from '../dist/src/migrations/1790753142319-add-payment-processing.js'
+import { DecoupleIapPaymentRecords1790992800000 } from '../dist/src/migrations/1790992800000-decouple-iap-payment-records.js'
 import { CatalogService } from '../dist/src/modules/billing/catalog/catalog.service.js'
 import { QuotaService } from '../dist/src/modules/billing/catalog/quota.service.js'
 import { OrdersService } from '../dist/src/modules/billing/orders/orders.service.js'
@@ -216,8 +217,8 @@ test('冻结用户的历史已付订单仍履约；中途失败整体回滚并�
   const row = await order(buyer, pkg)
   await payments.prepare(buyer.id, row.id)
   await source.getRepository(SysUserEntity).softDelete(buyer.id)
-  await source.query(`CREATE FUNCTION payment_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.order_id=${row.id} THEN RAISE EXCEPTION 'payment_fixture_failure'; END IF; RETURN NEW; END; $$`)
-  await source.query('CREATE TRIGGER payment_fixture_failure BEFORE INSERT ON biz_payment_transaction FOR EACH ROW EXECUTE FUNCTION payment_fixture_failure()')
+  await source.query(`CREATE FUNCTION payment_fixture_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.order_id=${row.id} AND NEW.status='fulfilled' THEN RAISE EXCEPTION 'payment_fixture_failure'; END IF; RETURN NEW; END; $$`)
+  await source.query('CREATE TRIGGER payment_fixture_failure BEFORE UPDATE ON biz_payment_transaction FOR EACH ROW EXECUTE FUNCTION payment_fixture_failure()')
   const payment = proof(row)
   try {
     await assert.rejects(settlement.settle(row.id, payment), /payment_fixture_failure/)
@@ -277,6 +278,8 @@ test('M4迁移保留历史积分与订单，空表往返、非空拒绝down、�
       await migration[direction](runner)
       assert.deepEqual(await snapshot(), original)
     }
+    await new DecoupleIapPaymentRecords1790992800000().up(runner)
+    assert.deepEqual(await snapshot(), original)
     const createRunner = fixture.createQueryRunner.bind(fixture)
     const release = runner.release.bind(runner)
     fixture.createQueryRunner = () => runner

@@ -43,7 +43,7 @@ export class PackageVersionWriteDto {
   @IsString()
   endsAt?: string | null
 
-  @ApiPropertyOptional({ type: String, nullable: true, description: '总限量；null不限、0不可买。仅微信/支付宝' })
+  @ApiPropertyOptional({ type: String, nullable: true, description: '四渠道共享总限量；null不限、0不可买' })
   @ValidateIf((_object, value) => value !== undefined && value !== null)
   @Matches(/^(?:0|[1-9]\d{0,18})$/)
   totalLimit?: string | null
@@ -290,6 +290,11 @@ export class PackageResponseDto extends PackageVersionWriteDto {
 
   @ApiProperty()
   revision: number
+}
+
+export class PackageDetailResponseDto extends PackageResponseDto {
+  @ApiProperty({ type: () => [ChannelProductResponseDto], description: '当前套餐版本的 iOS / Google Play 内购商品映射，未配置时为空数组' })
+  products: ChannelProductResponseDto[]
 }
 
 export class PackagePageDto {

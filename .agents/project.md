@@ -41,7 +41,7 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 
 ## 产品版本约定
 
-- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `2.0.1`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
+- 版本来源为根 `package.json` 和私有应用 `packages/backend/package.json`；当前两者均为 `3.0.0`，`docs/package.json` 无版本。每次决策读取实际清单，不使用本段快照覆盖清单。当前版本已达到 1.0.0，按 SemVer 判断 patch/minor/major；不套用 KuVibe 自身的 pre-1.0 政策。
 - 撤销此前“开发期默认延后递增”的 Agent 推断：缺少发布脚本、CHANGELOG 及历史递增记录不能证明存在延后政策。仅明确用户决定、发布政策或实际生效的自动化及其递增触发条件可支持 deferred；旧工程笔记保留作历史，不作为例外依据。
 - 固定统一版本：以根 `package.json` 为发布权威，`packages/backend/package.json` 同步相同版本；依据为用户在 2026-09-17 本次刷新中明确选择“统一版本：根目录与 core 同步递增”。按整个完成需求的最高语义影响递增一次，不按包分别重复递增；`docs/package.json` 继续无版本。
 - 每个完整需求通过实现、验收、审查和文档检查后，仅评估一次版本影响；按 `kuVibe.md` §30.1 记录需求标识、基线、目标、语义/有效影响及版本来源，重试沿用原决定。范围明确且无有效例外时实际递增，同步相关清单、内部依赖、锁文件和 CHANGELOG；总结必须报告影响、结果、旧版本 → 新版本及原因。
@@ -68,6 +68,10 @@ KuVibeAdmin（原 Nest AI Boot）是基于 KuVibe 工程协议、面向 AI 辅�
 根pnpm工作区只包括docs/backend，Vben保持自身独立workspace/catalog/锁。pnpm11显式virtualStoreType: project，保持本地与CI一致；独立backend锁仍供Docker冻结构建。watch入口--no-shell，启动失败清理Nest资源，避免重复消费者。
 
 使用、恢复及两项重复集成测试见docs/modules/task-scheduling.md。仅本地开发迁移/部署已完成，Atlas CLI lint及生产升级未执行；旧points-recharge-orders真实四渠道与生产容量门槛仍在active，独立需求版本归属需核对，不能直接覆盖当前权威版本清单。
+
+## 内购订单与平台流水
+
+2026-10-03追加完成并在现有本地Docker部署3.0.0。复用business order/payment attempt，正常先建订单，平台验真交易独立落biz_payment_transaction并允许无关联；不凭SKU/金额猜套餐、不自动建业务订单。多个套餐版本可共享同基础积分/标价SKU，赠分可不同。Apple每单UUID，Google新意图稳定混淆账号+客户端原订单补报，旧profile UUID兼容。四渠道套餐额度、新现金/内购30分钟预占；现金查证关单再释放、内购释放后迟到款人工核查。商店金额保留原始币种精度，未知为null。后台平台流水独立read/recheck/bind权限，人工关联须依据并重验，已释放旧单不能绕过。315单元/56隔离账务/21前端、实际备份恢复及schema diff0通过；Atlas hash/validate通过、Pro lint未执行，真实四渠道/生产容量仍pending。当前契约docs/modules/recharge-payment-flow.md，交付记录20261003-1308-feat-iap-payment-records.md，KuVibe/Vben上游保持。
 
 ## 系统字典
 

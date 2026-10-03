@@ -60,16 +60,21 @@ export class OrdersService {
         product = await manager.getRepository(ChannelProductEntity).findOneBy({ id: command.channelProductId, channel: command.channel, versionId: version.id, tenantId: '1' })
         if (!product)
           throw new UnprocessableEntityException('内购商品与套餐版本不匹配')
+        if (command.channel === 'google') {
+          const [pending] = await manager.query(`SELECT id FROM biz_recharge_order WHERE tenant_id=1 AND user_id=$1 AND channel='google' AND status='pending' AND expires_at>clock_timestamp() AND snapshot->>'applicationId'=$2 AND snapshot->>'environment'=$3 AND snapshot->>'productId'=$4 LIMIT 1`, [userId, product.applicationId, product.environment, product.productId])
+          if (pending)
+            throw new ConflictException('同一Google商品已有未结束的购买意图，请继续原订单或等待30分钟名额到期')
+        }
       }
       const demands: QuotaDemand[] = []
+      for (const [resourceKey, periodKey, limit] of [
+        [`package:${command.packageId}:total`, 'lifetime', version.totalLimit],
+        [`package:${command.packageId}:daily`, date, version.dailyLimit],
+        [`package:${command.packageId}:user:${userId}:total`, 'lifetime', version.userTotalLimit],
+        [`package:${command.packageId}:user:${userId}:daily`, date, version.userDailyLimit],
+      ] as const)
+        demands.push({ resourceKey, periodKey, limit, amount: '1' })
       if (!iap) {
-        for (const [resourceKey, periodKey, limit] of [
-          [`package:${command.packageId}:total`, 'lifetime', version.totalLimit],
-          [`package:${command.packageId}:daily`, date, version.dailyLimit],
-          [`package:${command.packageId}:user:${userId}:total`, 'lifetime', version.userTotalLimit],
-          [`package:${command.packageId}:user:${userId}:daily`, date, version.userDailyLimit],
-        ] as const)
-          demands.push({ resourceKey, periodKey, limit, amount: '1' })
         for (const promotion of [cash, bonus]) {
           if (!promotion)
             continue
@@ -119,15 +124,15 @@ export class OrdersService {
         snapshot,
         payableMinor: iap ? null : calculated.payableMinor,
         status: 'pending',
-        expiresAt: iap ? null : new Date(now.getTime() + 15 * 60 * 1000),
+        expiresAt: new Date(now.getTime() + 30 * 60 * 1000),
       })
       if (reserved.length) {
         await manager.getRepository(OrderReservationEntity).insert(reserved.map(item => ({ bucketId: item.bucketId, amount: item.amount, orderId: order.id, status: 'held' as const, purpose: item.resourceKey.startsWith('package:') ? 'package' as const : (item.resourceKey.startsWith(`promotion:${cash?.id}:`) || item.resourceKey === `coupon:${cash?.couponId}:total`) ? 'cash' as const : 'bonus' as const })))
       }
       if (!iap) {
         await manager.getRepository(RechargeUserStateEntity).update(state.id, { currentOrderId: order.id })
-        await this.outbox.enqueue(manager, 'order_expire', order.id, `order:${order.id}:expire`, order.expiresAt!)
       }
+      await this.outbox.enqueue(manager, 'order_expire', order.id, `order:${order.id}:expire`, order.expiresAt!)
       await this.event(manager, order.id, 'created', userId, '用户确认套餐版本与报价后创建订单')
       return this.result(order)
     })
@@ -211,6 +216,12 @@ export class OrdersService {
       const locked = await this.lockOrder(manager, id, order.userId)
       if (!['pending', 'closing'].includes(locked.status))
         return
+      if (['apple', 'google'].includes(locked.channel)) {
+        await this.releaseReservations(manager, id)
+        await manager.getRepository(RechargeOrderEntity).update(id, { status: 'closed', closedAt: () => 'NOW()' })
+        await this.event(manager, id, 'iap_reservation_expired', null, '内购30分钟预占到期释放；不代表商店关单，迟到款需人工核查')
+        return
+      }
       if (locked.paymentInitiated) {
         await manager.getRepository(RechargeOrderEntity).update(id, { status: 'closing' })
         await this.outbox.enqueue(manager, 'order_close', id, `order:${id}:close`)
@@ -297,6 +308,9 @@ export class OrdersService {
     }
     else {
       positiveInteger(command.payableMinor, 'payableMinor')
+      const maximum = command.channel === 'wechat' ? 2147483647n : 10000000000n
+      if (BigInt(command.payableMinor!) > maximum)
+        throw new UnprocessableEntityException('支付金额超过渠道允许范围')
       if (command.channelProductId !== undefined)
         throw new UnprocessableEntityException('微信/支付宝不使用内购商品映射')
     }

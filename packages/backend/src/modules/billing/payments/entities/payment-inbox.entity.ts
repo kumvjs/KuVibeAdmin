@@ -16,6 +16,7 @@ export interface InboxPayload {
   notificationType?: string
   refundScope?: 'full' | 'partial'
   refundNo?: string
+  reportedUserId?: string
 }
 
 @Entity('biz_payment_inbox')

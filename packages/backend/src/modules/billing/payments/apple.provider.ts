@@ -60,15 +60,18 @@ export class AppleProvider {
 
   private transaction(data: JWSTransactionDecodedPayload, evidenceHash: string): ProviderPayment {
     const environment = data.environment === Environment.SANDBOX ? 'sandbox' : data.environment === Environment.PRODUCTION ? 'production' : null
-    if (!environment || !data.bundleId || !/^\d{1,64}$/.test(data.transactionId ?? '') || !data.productId || data.type !== Type.CONSUMABLE || data.inAppOwnershipType !== 'PURCHASED' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(data.appAccountToken ?? ''))
-      throw new UnauthorizedException('Apple应用、消耗型商品、购买归属或订单绑定无效')
+    if (!environment || !data.bundleId || !/^\d{1,64}$/.test(data.transactionId ?? '') || !data.productId || data.type !== Type.CONSUMABLE || data.inAppOwnershipType !== 'PURCHASED')
+      throw new UnauthorizedException('Apple应用、消耗型商品或购买归属无效')
     const quantity = safeChannelInteger(data.quantity, '商品数量')
     const purchaseMillis = Number(data.purchaseDate)
     if (!Number.isSafeInteger(purchaseMillis) || purchaseMillis <= 0 || Number.isNaN(new Date(purchaseMillis).getTime()))
       throw new UnauthorizedException('Apple购买时间无效')
     const revoked = data.revocationDate !== undefined
     const partial = revoked && data.revocationPercentage !== undefined && data.revocationPercentage !== 100000
-    return { channel: 'apple', transactionKey: `${environment}:${data.bundleId}:${data.transactionId}`, merchantNo: null, applicationId: data.bundleId, merchantId: data.bundleId, environment, state: revoked ? 'refunded' : 'paid', amountMinor: null, currency: data.currency ?? null, productId: data.productId, bindingToken: data.appAccountToken!.toLowerCase(), quantity, paidAt: new Date(purchaseMillis), evidenceHash, ...(revoked ? { refundScope: partial ? 'partial' : 'full' } : {}) }
+    const platformAmount = data.price !== undefined && typeof data.currency === 'string' && /^[A-Z]{3}$/.test(data.currency)
+      ? { value: safeChannelInteger(data.price, '千分之一货币单位金额'), scale: 3, currency: data.currency, source: 'apple_transaction' as const }
+      : undefined
+    return { channel: 'apple', transactionKey: `${environment}:${data.bundleId}:${data.transactionId}`, merchantNo: null, applicationId: data.bundleId, merchantId: data.bundleId, environment, state: revoked ? 'refunded' : 'paid', amountMinor: null, currency: data.currency ?? null, productId: data.productId, bindingToken: data.appAccountToken?.toLowerCase() ?? null, quantity, paidAt: new Date(purchaseMillis), evidenceHash, ...(platformAmount ? { platformAmount } : {}), ...(revoked ? { refundScope: partial ? 'partial' : 'full' } : {}) }
   }
 
   private settings(applicationId: string, environment: string) {

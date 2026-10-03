@@ -34,7 +34,7 @@ export const packageFields: Field[] = [
     key,
     label,
     type: 'limit',
-    hint: '留空不限，0不可购买；仅微信/支付宝',
+    hint: '留空不限，0不可购买；四渠道共享额度',
   })),
   {
     key: 'startsAt',
@@ -132,9 +132,10 @@ export const promotionFields: Field[] = [
   },
   {
     key: 'packageIds',
-    label: '适用套餐ID',
-    type: 'list',
-    hint: '逗号分隔，留空适用所有套餐',
+    label: '适用套餐',
+    type: 'multi-select',
+    requiredWhen: (values) => values.effect === 'bonus_consecutive',
+    hint: '可搜索名称或标识并多选；普通活动留空适用所有套餐，连续充值赠送必须选择套餐，各套餐独立统计连续天数。',
   },
   {
     key: 'minimumMinor',
@@ -172,20 +173,13 @@ export const promotionFields: Field[] = [
 ];
 export const productFields: Field[] = [
   {
-    key: 'versionId',
-    label: '套餐版本ID',
-    type: 'integer',
-    positive: true,
-    required: true,
-  },
-  {
     key: 'channel',
     label: '商店',
     type: 'select',
     default: 'apple',
     options: [
-      { value: 'apple', label: 'Apple' },
-      { value: 'google', label: 'Google' },
+      { value: 'apple', label: 'iOS 内购（App Store）' },
+      { value: 'google', label: 'Google Play' },
     ],
   },
   { key: 'applicationId', label: '应用ID（Bundle / Package）', required: true },
@@ -199,7 +193,7 @@ export const productFields: Field[] = [
       { value: 'production', label: '生产' },
     ],
   },
-  { key: 'productId', label: '商店商品ID', required: true },
+  { key: 'productId', label: '内购商品 ID（Product ID）', required: true },
 ];
 export const reasonField: Field = {
   key: 'reason',

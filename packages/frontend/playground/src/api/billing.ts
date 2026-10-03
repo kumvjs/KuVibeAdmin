@@ -61,6 +61,9 @@ export interface RechargePackage {
   userTotalLimit: null | string;
   versionId: string;
 }
+export interface RechargePackageDetail extends RechargePackage {
+  products: ChannelProduct[];
+}
 export interface Promotion {
   maxConsecutiveDays?: number;
   dailyBonusPoints?: string[];
@@ -142,6 +145,27 @@ export interface Payment {
   parameters: null | Record<string, string>;
   status: string;
 }
+export interface PaymentRecord {
+  id: string;
+  orderId: null | string;
+  channel: Channel;
+  transactionKey: string;
+  productId: null | string;
+  applicationId: string;
+  environment: string;
+  platformState: 'closed' | 'paid' | 'pending' | 'refunded';
+  amountMinor: null | string;
+  currency: null | string;
+  platformAmount: null | { currency: string; scale: number; source: string; value: string };
+  platformOrderId: null | string;
+  quantity: string;
+  paidAt: null | string;
+  status: 'fulfilled' | 'matched' | 'review' | 'unmatched';
+  reason: null | string;
+  createdAt: string;
+  verifiedAt: string;
+  manualBinding: null | { actorId: string; orderId: string; reason: string };
+}
 export interface Finding {
   actual?: string;
   code: string;
@@ -193,6 +217,8 @@ export const getPackages = (params: Params, admin = false) =>
     admin ? '/system/billing/packages' : '/recharge/packages',
     { params },
   );
+export const getPackageDetail = (id: string) =>
+  requestClient.get<RechargePackageDetail>(`/system/billing/packages/${encodeURIComponent(id)}`);
 export const savePackage = (data: Body, id?: string) =>
   requestClient.post<RechargePackage>(
     id ? `/system/billing/packages/${id}/versions` : '/system/billing/packages',
@@ -255,3 +281,9 @@ export const getRisks = (userId: string) =>
   requestClient.get<Risk[]>(`/system/billing/risks/user/${userId}`);
 export const resolveRisk = (id: string, reason: string) =>
   requestClient.post<Risk>(`/system/billing/risks/${id}/resolve`, { reason });
+export const getPaymentRecords = (params: Params) =>
+  requestClient.get<CursorPage<PaymentRecord>>('/system/billing/payments', { params });
+export const recheckPaymentRecord = (id: string, reason: string) =>
+  requestClient.post(`/system/billing/payments/${id}/recheck`, { reason });
+export const bindPaymentRecord = (id: string, data: Body) =>
+  requestClient.post<PaymentRecord>(`/system/billing/payments/${id}/bind`, data);

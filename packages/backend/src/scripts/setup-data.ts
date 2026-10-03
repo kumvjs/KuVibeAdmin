@@ -3,6 +3,7 @@ import { In, IsNull } from 'typeorm'
 import { Roles } from '../modules/auth/auth.constant.js'
 import { CATALOG_PERMISSIONS } from '../modules/billing/catalog/catalog.types.js'
 import { ORDER_PERMISSIONS } from '../modules/billing/orders/order.types.js'
+import { PAYMENT_PERMISSIONS } from '../modules/billing/payments/payment.types.js'
 import { POINT_PERMISSIONS } from '../modules/billing/points/points.types.js'
 import { DEPT_PERMISSIONS, DeptStatus } from '../modules/system/dept/dept.types.js'
 import { SysDeptEntity } from '../modules/system/dept/entities/dept.entity.js'
@@ -77,6 +78,9 @@ export const INITIAL_MENUS: SeedMenu[] = [
   { name: 'BillingOrderRead', parent: 'SystemBilling', path: '/system/billing/orders', component: '/system/billing/orders', authCode: ORDER_PERMISSIONS.READ, type: MenuType.MENU, meta: { title: '订单与账务' } },
   { name: 'BillingOrderRefund', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.REFUND, type: MenuType.BUTTON, meta: { title: '全额退款' } },
   { name: 'BillingOrderReconcile', parent: 'SystemBilling', authCode: ORDER_PERMISSIONS.RECONCILE, type: MenuType.BUTTON, meta: { title: '发起对账' } },
+  { name: 'BillingPaymentRead', parent: 'SystemBilling', path: '/system/billing/payments', component: '/system/billing/payments', authCode: PAYMENT_PERMISSIONS.READ, type: MenuType.MENU, meta: { title: '平台支付流水' } },
+  { name: 'BillingPaymentRecheck', parent: 'BillingPaymentRead', authCode: PAYMENT_PERMISSIONS.RECHECK, type: MenuType.BUTTON, meta: { title: '重新验真' } },
+  { name: 'BillingPaymentBind', parent: 'BillingPaymentRead', authCode: PAYMENT_PERMISSIONS.BIND, type: MenuType.BUTTON, meta: { title: '人工关联订单' } },
   { name: 'BillingRiskResolve', parent: 'SystemBilling', authCode: 'system:billing:risk:resolve', type: MenuType.BUTTON, meta: { title: '人工风险处置' } },
 ]
 

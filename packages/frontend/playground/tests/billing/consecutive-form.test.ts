@@ -1,8 +1,10 @@
 /* eslint-disable vue/one-component-per-file -- 使用弹窗和按钮替身验证实际业务表单提交。 */
 import { createApp, h, nextTick } from 'vue';
+
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import FormEditor from '#/views/billing/form-editor.vue';
+
 import { promotionFields } from '#/views/billing/fields';
+import FormEditor from '#/views/billing/form-editor.vue';
 
 vi.mock('@vben/stores', () => ({
   useUserStore: () => ({ userInfo: { userId: '1' } }),
@@ -11,6 +13,15 @@ vi.mock('@vben/stores', () => ({
 vi.mock('antdv-next', async () => {
   const { defineComponent, h } = await import('vue');
   return {
+    Select: defineComponent({
+      props: { value: { type: Array, default: () => [] }, options: { type: Array, default: () => [] } },
+      emits: ['update:value'],
+      setup: (props, { emit }) => () => h('select', {
+        multiple: true,
+        value: props.value,
+        onChange: (event: Event) => emit('update:value', [...(event.target as HTMLSelectElement).selectedOptions].map((option) => option.value)),
+      }, (props.options ?? []).map((option: { label: string; value: string }) => h('option', { value: option.value }, option.label))),
+    }),
     Modal: defineComponent({
       setup:
         (_, { slots }) =>

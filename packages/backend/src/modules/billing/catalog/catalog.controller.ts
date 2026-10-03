@@ -6,7 +6,7 @@ import { ApiSecurityAuth } from '#/common/decorators/swagger.decorator.js'
 import { RequirePermissions } from '#/modules/auth/decorators/index.js'
 import { CatalogService } from './catalog.service.js'
 import { CATALOG_PERMISSIONS } from './catalog.types.js'
-import { BillingIdDto, CatalogListQueryDto, ChannelProductResponseDto, ChannelProductWriteDto, CouponCreateDto, CouponResponseDto, PackageCreateDto, PackagePageDto, PackageResponseDto, PackageVersionWriteDto, PromotionCreateDto, PromotionPageDto, PromotionResponseDto, PromotionVersionWriteDto, PublishStatusDto, QuoteQueryDto, QuoteResponseDto } from './dto/catalog.dto.js'
+import { BillingIdDto, CatalogListQueryDto, ChannelProductResponseDto, ChannelProductWriteDto, CouponCreateDto, CouponResponseDto, PackageCreateDto, PackageDetailResponseDto, PackagePageDto, PackageResponseDto, PackageVersionWriteDto, PromotionCreateDto, PromotionPageDto, PromotionResponseDto, PromotionVersionWriteDto, PublishStatusDto, QuoteQueryDto, QuoteResponseDto } from './dto/catalog.dto.js'
 
 @Controller('recharge/packages')
 @ApiTags('充值套餐')
@@ -50,6 +50,14 @@ export class SystemCatalogController {
     return this.catalog.packages(query)
   }
 
+  @Get('packages/:id')
+  @RequirePermissions(CATALOG_PERMISSIONS.READ)
+  @ApiOperation({ summary: '读取套餐详情及当前版本内购商品映射，支持草稿与下架套餐' })
+  @ApiResult({ type: PackageDetailResponseDto })
+  packageDetail(@Param() params: BillingIdDto) {
+    return this.catalog.packageDetail(params.id)
+  }
+
   @Post('packages')
   @HttpCode(200)
   @RequirePermissions(CATALOG_PERMISSIONS.WRITE)
@@ -80,7 +88,7 @@ export class SystemCatalogController {
   @Post('products')
   @HttpCode(200)
   @RequirePermissions(CATALOG_PERMISSIONS.WRITE)
-  @ApiOperation({ summary: '建立固定内购SKU权益，不能覆写旧SKU' })
+  @ApiOperation({ summary: '为套餐版本关联内购商品；同类同基础权益可共享SKU，旧关联不可覆写' })
   @ApiResult({ type: ChannelProductResponseDto })
   mapProduct(@Body() dto: ChannelProductWriteDto, @CurrentUser() user: LoginUserContext) {
     return this.catalog.mapProduct(dto, user.uid)

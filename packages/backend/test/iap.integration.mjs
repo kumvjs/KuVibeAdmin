@@ -46,7 +46,7 @@ async function user() {
   return source.getRepository(SysUserEntity).save({ username: code(), name: '内购测试用户', passwordHash: '$argon2id$fixture' })
 }
 async function pack() {
-  const row = await catalog.createPackage({ code: code(), title: '固定内购权益', priceMinor: '1000', basePoints: '1000', giftPoints: '100', totalLimit: '0', dailyLimit: '0' }, actor.id)
+  const row = await catalog.createPackage({ code: code(), title: '固定内购权益', priceMinor: '1000', basePoints: '1000', giftPoints: '100', totalLimit: null, dailyLimit: null }, actor.id)
   await catalog.publishPackage(row.id, 'enabled')
   return row
 }
@@ -59,7 +59,7 @@ async function order(buyer, pkg, channel) {
 }
 function purchase(row, parameters, fields = {}) {
   const credential = row.channel === 'apple' ? String(BigInt(`0x${randomUUID().replaceAll('-', '')}`)) : code()
-  const payment = { channel: row.channel, transactionKey: row.channel === 'google' ? createHash('sha256').update(credential).digest('hex') : `sandbox:test.iap:${credential}`, merchantNo: null, ...makeBinding('test.iap', 'sandbox'), state: 'paid', amountMinor: null, currency: null, productId: parameters.productId, bindingToken: parameters.appAccountToken ?? parameters.obfuscatedProfileId, storeAccountId: parameters.obfuscatedAccountId ?? null, quantity: '1', paidAt: new Date(), evidenceHash: createHash('sha256').update(credential).digest('hex'), ...fields }
+  const payment = { channel: row.channel, transactionKey: row.channel === 'google' ? createHash('sha256').update(credential).digest('hex') : `sandbox:test.iap:${credential}`, merchantNo: null, ...makeBinding('test.iap', 'sandbox'), state: 'paid', amountMinor: null, currency: null, productId: parameters.productId, bindingToken: parameters.appAccountToken ?? parameters.obfuscatedProfileId ?? null, storeAccountId: parameters.obfuscatedAccountId ?? null, quantity: '1', paidAt: new Date(), evidenceHash: createHash('sha256').update(credential).digest('hex'), ...fields }
   proofs.set(credential, payment)
   return credential
 }
@@ -106,7 +106,7 @@ after(async () => {
     await source.destroy()
 })
 
-test('Apple/Google并发验真跨渠道只中一次首单；零站内限量不影响固定权益', async () => {
+test('Apple/Google并发验真跨渠道只中一次首单；四渠道套餐额度预占核销', async () => {
   const buyer = await user()
   const pkg = await pack()
   const promo = await catalog.createPromotion({ code: code(), title: '跨渠道首单', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), effect: 'bonus_fixed', value: '500', eligibility: 'first_user', channels: ['apple', 'google'], packageIds: [pkg.id], minimumMinor: '0', requiresCoupon: false, priority: 1 }, actor.id)
@@ -121,7 +121,7 @@ test('Apple/Google并发验真跨渠道只中一次首单；零站内限量不�
   const transactions = await source.query('SELECT bonus_points::text FROM biz_payment_transaction WHERE order_id=ANY($1)', [purchases.map(item => item.row.id)])
   assert.deepEqual(transactions.map(row => row.bonus_points).sort(), ['0', '500'])
   assert.equal((await source.query('SELECT settlement_sequence::text FROM biz_recharge_user_state WHERE user_id=$1', [buyer.id]))[0].settlement_sequence, '2')
-  assert.equal((await source.query('SELECT id FROM biz_order_reservation WHERE order_id=ANY($1) AND purpose=\'package\'', [purchases.map(item => item.row.id)])).length, 0)
+  assert.equal((await source.query('SELECT id FROM biz_order_reservation WHERE order_id=ANY($1) AND purpose=\'package\'', [purchases.map(item => item.row.id)])).length, 8)
   await Promise.all(inboxes.map(row => payments.processInbox(row.inboxId)))
   assert.equal((await points.account(buyer.id)).available, '2700')
 })
@@ -167,14 +167,14 @@ test('消费确认失败不回滚已到账权益；原任务可重试，不能�
   assert.equal(consumeCount, before + 1)
 })
 
-test('重复凭据/重复通知只一份权益；RTDN通过订单UUID补单，不靠Google orderId', async () => {
+test('重复凭据/重复通知只一份权益；RTDN先落流水，客户端以原订单补报关联，不靠Google orderId', async () => {
   const buyer = await user()
   const { row, parameters } = await order(buyer, await pack(), 'google')
   const token = purchase(row, parameters)
   const notifications = await Promise.all(Array.from({ length: 30 }, () => payments.acceptGoogle(token, 'fixture')))
   assert.equal(new Set(notifications.map(item => item.inboxId)).size, 1)
   await Promise.all(Array.from({ length: 30 }, () => payments.processInbox(notifications[0].inboxId)))
-  assert.equal((await points.account(buyer.id)).available, '1100')
+  assert.equal((await points.account(buyer.id)).available, '0')
   const accepted = await receipt(buyer, row, token)
   await payments.processInbox(accepted.inboxId)
   assert.equal((await points.account(buyer.id)).available, '1100')
@@ -183,7 +183,7 @@ test('重复凭据/重复通知只一份权益；RTDN通过订单UUID补单，�
 })
 
 test('错SKU/账号/订单/数量/环境均不履约；商店取消不消耗首单', async () => {
-  for (const fields of [{ productId: 'other.sku' }, { storeAccountId: randomUUID() }, { bindingToken: randomUUID() }, { quantity: '2' }]) {
+  for (const fields of [{ productId: 'other.sku' }, { storeAccountId: randomUUID() }, { paidAt: new Date(0) }, { quantity: '2' }]) {
     const buyer = await user()
     const { row, parameters } = await order(buyer, await pack(), 'google')
     const accepted = await receipt(buyer, row, purchase(row, parameters, fields))
@@ -210,7 +210,7 @@ test('Apple迟到验真仍按固定旧版本履约；无绑定历史交易仅待
   await payments.processInbox(accepted.inboxId)
   assert.equal((await orders.get(buyer.id, row.id)).status, 'paid')
   assert.equal((await points.account(buyer.id)).available, '1100')
-  const orphan = purchase(row, parameters, { bindingToken: randomUUID() })
+  const orphan = purchase(row, parameters, { bindingToken: null })
   const notice = await payments.acceptApple(orphan)
   await payments.processInbox(notice.inboxId)
   assert.equal((await source.query('SELECT status,reason FROM biz_payment_inbox WHERE id=$1', [notice.inboxId]))[0].status, 'review')

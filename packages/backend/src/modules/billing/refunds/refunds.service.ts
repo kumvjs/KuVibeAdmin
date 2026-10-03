@@ -214,6 +214,8 @@ export class RefundsService {
     }
     if (gap)
       await this.risk(manager, order, 'refund_consumed_gap', gap)
+    if (!order.paidLedgerId)
+      await this.orders.releaseReservations(manager, order.id)
     // 尚未入账的商店退款不占首单；经review中间态遵循既有数据库状态机。
     if (!['paid', 'refund_pending', 'review'].includes(order.status))
       await manager.getRepository(RechargeOrderEntity).update(order.id, { status: 'review' })

@@ -30,6 +30,10 @@ SELECT status,COUNT(*) AS count,MIN(created_at) AS oldest_inbox
 FROM biz_payment_inbox WHERE tenant_id=1 AND status<>'done'
 GROUP BY status;
 
+SELECT channel,status,COUNT(*) AS count,MIN(created_at) AS oldest_payment
+FROM biz_payment_transaction WHERE tenant_id=1 AND status<>'fulfilled'
+GROUP BY channel,status;
+
 SELECT type,COUNT(*) AS count,SUM(gap_points) AS gap_points
 FROM biz_billing_risk WHERE tenant_id=1 AND status='open'
 GROUP BY type;
@@ -38,6 +42,8 @@ GROUP BY type;
 关注最老到期任务、处理租约、失败计数、长期关单/退款、待审通知和消费缺口。网络失败按原业务键重试；明确pending按正常等待延迟，不耗尽失败次数。租约过期后会重领，旧worker不能确认新租约。
 
 先确认原商户/应用和密钥可用，再按订单发起对账任务恢复其死信；有效租约保持原样。查单未知不能释放库存或退款冻结。孤儿通知和矛盾交易需核对原购买绑定，不能猜测账号或直接标记paid。已关闭订单的迟到现金款可全额退还，不使用已释放额度继续发放。
+
+独立平台流水与业务订单可暂时无关联。后台“平台支付流水”支持未关联/待核查筛选、原始币种精度金额、内购重新验真和有权限的人工关联；必须填写依据，且只能关联有效未入账订单，不能改绑已有交易或绕过释放名额。现金流水继续用业务订单对账入口。Google未知实付由`payment_amount`补查；自动未关联恢复最多三天，不能在Google未确认自动退款后承诺扣款仍保留。四渠道30分钟期限及异常处置见[充值接入流程](recharge-payment-flow.md)。
 
 对账发现差异会保留报告并限制消费。仅在证据完整且差异属于账户投影时显式申请审计重建；来源、交易和额度异常先保留数据并核查，不使用无凭据SQL改余额/删流水。风险记录单独审计处置，全部风险解决才解除限制。已经消费的外部退款缺口需人工决定追缴或核销；系统不会挪用其他充值积分或自动核销。
 

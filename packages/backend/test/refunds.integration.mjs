@@ -194,7 +194,7 @@ test('幂等对账核对账本、批次、冻结、订单、额度；明确未�
 })
 
 test('M5迁移保留历史已付订单/首单/积分，空表往返、非空拒绝down、实体diff为空、审计防篡改', async () => {
-  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/**/!(recharge-package-streak|dict).entity.js'] }).initialize()
+  const fixture = await new DataSource({ ...config, database: 'kuvibe_billing_test_migration', migrations: [], entities: ['dist/src/modules/{auth,user,upload}/**/*.entity.js', 'dist/src/modules/system/{dept,menu,role,sys-user,log}/**/*.entity.js', 'dist/src/modules/billing/**/!(recharge-package-streak).entity.js'] }).initialize()
   const runner = fixture.createQueryRunner()
   try {
     await runner.startTransaction()
@@ -216,6 +216,9 @@ test('M5迁移保留历史已付订单/首单/积分，空表往返、非空拒�
       await migration[direction](runner)
       assert.deepEqual(await snapshot(), original)
     }
+    const extension = await import('../dist/src/migrations/1790992800000-decouple-iap-payment-records.js')
+    await new extension.DecoupleIapPaymentRecords1790992800000().up(runner)
+    assert.deepEqual(await snapshot(), original)
     const createRunner = fixture.createQueryRunner.bind(fixture)
     const release = runner.release.bind(runner)
     fixture.createQueryRunner = () => runner

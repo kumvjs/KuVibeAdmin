@@ -11,6 +11,7 @@ import { AlipayProvider } from './payments/alipay.provider.js'
 import { AppleProvider } from './payments/apple.provider.js'
 import { GoogleProvider } from './payments/google.provider.js'
 import { PaymentConfigService } from './payments/payment-config.service.js'
+import { PaymentRecordsController, StorePurchaseRestoreController } from './payments/payment-records.controller.js'
 import { PaymentSecretsService } from './payments/payment-secrets.service.js'
 import { PaymentNotificationsController, PaymentsController } from './payments/payments.controller.js'
 import { PaymentsService } from './payments/payments.service.js'
@@ -29,7 +30,7 @@ import { RefundsService } from './refunds/refunds.service.js'
 
 @Module({
   imports: [TypeOrmModule.forFeature([PointAccountEntity, PointLedgerEntity, PointLotEntity, PointAllocationEntity, PointHoldEntity, PointHoldItemEntity])],
-  controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController, RefundsController, BillingRisksController],
+  controllers: [PointsController, SystemPointsController, RechargeCatalogController, SystemCatalogController, OrdersController, SystemOrdersController, PaymentsController, PaymentNotificationsController, PaymentRecordsController, StorePurchaseRestoreController, RefundsController, BillingRisksController],
   providers: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker, PaymentsService, SettlementService, WechatProvider, AlipayProvider, PaymentConfigService, AppleProvider, GoogleProvider, PaymentSecretsService, RefundsService, ReconciliationService],
   exports: [PointsService, CatalogService, QuotaService, OrdersService, BillingOutboxService, BillingWorker],
 })

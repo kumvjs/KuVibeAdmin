@@ -97,14 +97,14 @@ test('改版拒绝旧确认参数；原订单不可变，已发起支付取消�
   assert.equal((await source.query(`SELECT count(*)::int AS count FROM biz_billing_outbox WHERE type='order_close' AND aggregate_id=$1`, [order.id]))[0].count, 1)
 })
 
-test('内购无15分钟过期或站内库存，不允许站内取消', async () => {
+test('内购预占四类额度、30分钟期限，不允许站内取消', async () => {
   const buyer = await user()
-  const { row } = await pack({ totalLimit: '0', dailyLimit: '0' })
+  const { row } = await pack({ totalLimit: '1', dailyLimit: '1' })
   const product = await catalog.mapProduct({ versionId: row.versionId, channel: 'google', applicationId: 'test.app', environment: 'sandbox', productId: code() }, actor.id)
   const order = await orders.create(buyer.id, { ...command(row), channel: 'google', client: 'app', payableMinor: undefined, channelProductId: product.id })
   assert.equal(order.payableMinor, null)
-  assert.equal(order.expiresAt, null)
-  assert.equal((await source.query('SELECT id FROM biz_order_reservation WHERE order_id=$1', [order.id])).length, 0)
+  assert.ok(Math.abs(new Date(order.expiresAt) - Date.now() - 1800000) < 10000)
+  assert.equal((await source.query('SELECT id FROM biz_order_reservation WHERE order_id=$1', [order.id])).length, 4)
   await assert.rejects(orders.cancel(buyer.id, order.id), /内购不能/)
 })
 
@@ -206,6 +206,11 @@ test('M3迁移保留既有用户与积分，空表往返、非空拒绝down、�
       await migration[direction](runner)
       assert.deepEqual(await snapshot(), original)
     }
+    for (const file of ['1790753142319-add-payment-processing', '1790992800000-decouple-iap-payment-records']) {
+      const module = await import(`../dist/src/migrations/${file}.js`)
+      await new (Object.values(module).find(value => typeof value === 'function'))().up(runner)
+    }
+    assert.deepEqual(await snapshot(), original)
     const createRunner = fixture.createQueryRunner.bind(fixture)
     const release = runner.release.bind(runner)
     fixture.createQueryRunner = () => runner

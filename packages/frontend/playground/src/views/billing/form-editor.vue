@@ -3,7 +3,7 @@ import type { Body } from '#/api/billing';
 
 import { computed, reactive, ref, watch } from 'vue';
 
-import { Button, Modal } from 'antdv-next';
+import { Button, Modal, Select } from 'antdv-next';
 
 import { errorText, integer, minor, money } from './helpers';
 
@@ -12,13 +12,14 @@ export interface Field {
   label: string;
   type?:
     | 'boolean'
-    | 'datetime'
     | 'daily-bonuses'
+    | 'datetime'
     | 'integer'
     | 'limit'
     | 'list'
     | 'money'
     | 'multi'
+    | 'multi-select'
     | 'number'
     | 'select'
     | 'text'
@@ -30,6 +31,7 @@ export interface Field {
   required?: boolean;
   min?: number;
   max?: number;
+  requiredWhen?: (values: Record<string, boolean | string | string[]>) => boolean;
   visible?: (values: Record<string, boolean | string | string[]>) => boolean;
 }
 const props = defineProps<{
@@ -69,7 +71,7 @@ watch(
         values[field.key] = value === undefined ? '' : money(String(value));
       else if (field.type === 'list')
         values[field.key] = Array.isArray(value) ? value.join(',') : '';
-      else if (field.type === 'multi' || field.type === 'daily-bonuses')
+      else if (['daily-bonuses', 'multi', 'multi-select'].includes(field.type || ''))
         values[field.key] = Array.isArray(value) ? [...value] : [];
       else if (field.type === 'boolean') values[field.key] = value === true;
       else
@@ -94,10 +96,10 @@ async function save() {
       const value = values[field.key];
       const text = typeof value === 'string' ? value.trim() : '';
       if (
-        field.required &&
+        (field.required || field.requiredWhen?.(values)) &&
         (value === '' || (Array.isArray(value) && value.length === 0))
       )
-        throw new Error(`请填写${field.label}`);
+        throw new Error(`请${field.type === 'multi-select' ? '选择' : '填写'}${field.label}`);
       switch (field.type) {
         case 'daily-bonuses': {
           body[field.key] = Array.isArray(value) ? value.map((item) => integer(item)) : [];
@@ -131,6 +133,10 @@ async function save() {
         }
         case 'multi': {
           body[field.key] = value;
+          break;
+        }
+        case 'multi-select': {
+          body[field.key] = Array.isArray(value) ? [...value] : [];
           break;
         }
         case 'number': {
@@ -171,13 +177,13 @@ async function save() {
     <p v-if="notice" class="billing-muted mb-4">{{ notice }}</p>
     <form class="billing-form" @submit.prevent="save">
       <component
-        :is="field.type === 'daily-bonuses' ? 'div' : 'label'"
+        :is="['daily-bonuses', 'multi-select'].includes(field.type || '') ? 'div' : 'label'"
         v-for="field in visibleFields"
         :key="field.key"
         class="billing-field"
         :class="{ 'billing-full': field.type === 'textarea' || field.type === 'daily-bonuses' }"
       >
-        <span>{{ field.label }}{{ field.required ? ' *' : '' }}</span>
+        <span :id="field.type === 'multi-select' ? `${field.key}-label` : undefined">{{ field.label }}{{ field.required || field.requiredWhen?.(values) ? ' *' : '' }}</span>
         <div v-if="field.type === 'daily-bonuses'" class="billing-form">
           <label v-for="day in bonusDayCount" :key="day" class="billing-field">
             <span>第 {{ day }} 天赠送积分</span>
@@ -191,6 +197,19 @@ async function save() {
             />
           </label>
         </div>
+        <Select
+          v-else-if="field.type === 'multi-select'"
+          v-model:value="values[field.key] as string[]"
+          mode="multiple"
+          :options="field.options"
+          :aria-labelledby="`${field.key}-label`"
+          :aria-required="field.required || field.requiredWhen?.(values)"
+          :show-search="{ optionFilterProp: 'label' }"
+          allow-clear
+          placeholder="请选择套餐，可多选"
+          :disabled="busy"
+          :get-popup-container="(trigger: HTMLElement) => trigger.parentElement!"
+        />
         <input
           v-else-if="field.type === 'boolean'"
           v-model="values[field.key] as boolean"
